@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here.
 
-Last updated: 2026-10-08 · Status: **Planning complete — P0.1 next**
+Last updated: 2026-10-08 · Status: **P0.1 in progress — repo live on GitHub; README + skeleton pending**
 
 ## 1. Mission & success criteria
 
@@ -336,8 +336,9 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - Created `docs/prd.md`, `docs/technical-design.md`, `docs/tasks.md`; this file + `AGENTS.md` are live.
 - Decisions locked: FastAPI + LangChain 1.x/LangGraph + pgvector on Neon + OpenAI/DeepSeek; pair-typing mode with `i-have-adhd` on; monorepo `web/`/`api/`/`infra/`.
 - Versions verified against PyPI/npm and pinned in §5.
-- Project renamed to **SourcebookLM** — folder/slug `sourcebooklm`; owner ran `git init` (branch `main`, no commits yet). P0.1 still covers `.gitignore`, the folder skeleton, and the first commit.
-- No code yet. **Next: P0.1 — repo init** (acceptance criteria in `docs/tasks.md`).
+- Project renamed to **SourcebookLM** — folder/slug `sourcebooklm`; `git init` (branch `main`).
+- P0.1 (partial): `.gitignore` added; first commit `6b942c8` (8 files); public repo pushed → https://github.com/ArmanRuhit/sourcebooklm. Remaining: README placeholder, folder skeleton.
+- No code yet. **Next: finish P0.1 (README + skeleton) → then P0.2 — API scaffold.**
 
 ## 12. Docs map
 
