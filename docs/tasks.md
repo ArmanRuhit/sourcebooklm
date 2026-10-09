@@ -2,7 +2,7 @@
 
 Slice-by-slice breakdown for the roadmap in [CLAUDE.md §8](../CLAUDE.md). Workflow rules (pair-typing, quiz, verify) live in [CLAUDE.md §7](../CLAUDE.md); architecture context in [technical-design.md](technical-design.md).
 
-**Definition of done (every slice):** code typed by owner → verify commands green → quiz answered → committed → `CLAUDE.md` §11 updated.
+**Definition of done (every slice):** code typed by owner → verify commands green → committed → `CLAUDE.md` §11 updated. (Quizzes are banked in [`quiz-bank.md`](quiz-bank.md) and reviewed post-project — owner directive 2026-10-10.)
 
 Slice IDs match the roadmap exactly (`P<phase>.<n>`). Checkboxes live in CLAUDE.md — this file defines *what done means*.
 

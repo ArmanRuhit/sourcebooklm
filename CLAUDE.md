@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-10 · Status: **P0.2 complete — FastAPI app + health endpoint green; P0.3 (local infra) up next**
+Last updated: 2026-10-10 · Status: **P0.3 complete — local Postgres 17 + pgvector up and verified; P0.4 (web scaffold) up next**
 
 ## 1. Mission & success criteria
 
@@ -214,7 +214,7 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 
 - [x] P0.1 Repo init: `git init`, `.gitignore`, folder skeleton, README placeholder, first commit
 - [x] P0.2 API scaffold: uv project, pinned deps, `/api/v1/health`, ruff + pytest green
-- [ ] P0.3 Local infra: docker-compose pgvector, `.env.example`
+- [x] P0.3 Local infra: docker-compose pgvector, `.env.example`
 - [ ] P0.4 Web scaffold: Next 16 + Tailwind + shadcn, page showing API health
 
 *Exit:* `docker compose up -d` + `uv run uvicorn` serves health; `bun dev` shows it; both test/lint suites green.
@@ -360,6 +360,15 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - Time crunch: the 3-question quiz moves from per-slice to **post-project review**. Slices now close on **typed + verification green + committed**.
 - Questions are banked per slice in [`docs/quiz-bank.md`](docs/quiz-bank.md) (P0.2 included, 2 gaps marked for revisit); on-demand rounds anytime via "quiz me".
 - Interview-facing notes stay captured as we go (§11 + ADRs from P1), so the end-of-project discussion/interview pass stays cheap.
+
+### 2026-10-10 — P0.3 complete (local infra)
+
+- `infra/docker-compose.yml`: `pgvector/pgvector:pg17` service `db`, named volume `pgdata`, `pg_isready` healthcheck (5s/3s/10). pg18 deliberately avoided (data-dir layout change); the **Python** pgvector package stays indirect (see P0.2 note).
+- `api/.env.example`: committed template for all 9 env vars; real values go to gitignored `api/.env` at P1. `OPENAI_CHAT_MODEL=gpt-5-mini` is provisional — re-confirm at P3.2.
+- Caught before first boot: volume mount typo (`/var/lib/postgresql/dataa`) — valid YAML, passes `compose config` and healthcheck, but would silently keep data in an anonymous volume; fixed to `/var/lib/postgresql/data`.
+- Verify green: `docker compose ps` → `sourcebooklm-db-1 … (healthy)`; in-container psql → PostgreSQL 17.11; `vector 0.8.7` listed as available → `CREATE EXTENSION` + `\dx` shows it. DB left running for P1.
+- Gitignore re-verified in a scratch repo: `api/.env.example` committable via the `!.env.example` negation; `api/.env` stays ignored.
+- **Next: P0.4 — web scaffold (Next 16 + Tailwind + shadcn, page showing API health).**
 
 ## 12. Docs map
 
