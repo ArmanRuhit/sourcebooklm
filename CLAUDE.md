@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here.
 
-Last updated: 2026-10-08 · Status: **P0.1 in progress — repo live on GitHub; README + skeleton pending**
+Last updated: 2026-10-10 · Status: **P0.2 complete — FastAPI app + health endpoint green; P0.3 (local infra) up next**
 
 ## 1. Mission & success criteria
 
@@ -212,8 +212,8 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 
 ### Phase 0 — Foundation (P0)
 
-- [ ] P0.1 Repo init: `git init`, `.gitignore`, folder skeleton, README placeholder, first commit
-- [ ] P0.2 API scaffold: uv project, pinned deps, `/api/v1/health`, ruff + pytest green
+- [x] P0.1 Repo init: `git init`, `.gitignore`, folder skeleton, README placeholder, first commit
+- [x] P0.2 API scaffold: uv project, pinned deps, `/api/v1/health`, ruff + pytest green
 - [ ] P0.3 Local infra: docker-compose pgvector, `.env.example`
 - [ ] P0.4 Web scaffold: Next 16 + Tailwind + shadcn, page showing API health
 
@@ -339,6 +339,21 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - Project renamed to **SourcebookLM** — folder/slug `sourcebooklm`; `git init` (branch `main`).
 - P0.1 (partial): `.gitignore` added; first commit `6b942c8` (8 files); public repo pushed → https://github.com/ArmanRuhit/sourcebooklm. Remaining: README placeholder, folder skeleton.
 - No code yet. **Next: finish P0.1 (README + skeleton) → then P0.2 — API scaffold.**
+
+### 2026-10-09 — P0.1 complete (repo init)
+
+- README placeholder added; commit `0a1d41e` pushed to GitHub.
+- Folder skeleton `api/ web/ infra/` in place locally; empty dirs intentionally untracked (no `.gitkeep`) — their first real files land in P0.2–P0.4.
+- Quiz passed: git tracks files not dirs; `.env` stays out of history via `.gitignore`.
+- **Next: P0.2 — API scaffold (uv project, `/api/v1/health`, ruff + pytest green).**
+
+### 2026-10-10 — P0.2 complete (API scaffold)
+
+- `api/` typed and verified: `pyproject.toml` (exact pins + dev group), `.python-version` (3.13), `uv.lock` (96 packages; pgvector resolves to 0.3.6 — `langchain-postgres` caps it `<0.4`, so no direct pin), `app/main.py` (app factory + `/api/v1/health`), `tests/test_health.py` (async httpx `ASGITransport`, no live server).
+- Verify green: `uv run pytest` → 1 passed · `uv run ruff check .` → clean · `uv run mypy` → clean · live `uvicorn` + `curl /api/v1/health` → `{"status":"ok"}`. Hitting `/health` without the prefix → 404, by design.
+- Quiz: lockfile-vs-direct-pin distinction solid; filled the gaps on app-factory benefits (test overrides, no import-time side effects) and the `ASGITransport` blind spot — in-process calls skip lifespan/startup hooks (a future DB-pool init needs a lifespan-aware test).
+- Editor note: basedpyright's `reportImplicitRelativeImport` misreads the pytest `pythonpath=["."]` layout; disabled editor-locally in gitignored `.vscode/settings.json`.
+- **Next: P0.3 — local infra (docker-compose pgvector + `.env.example`).**
 
 ## 12. Docs map
 
