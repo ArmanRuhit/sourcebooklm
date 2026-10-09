@@ -2,7 +2,7 @@
 
 **Read me first.** Single source of truth for `sourcebooklm`: mission, rubric analysis, architecture, conventions, pairing workflow, roadmap, and the live progress log. [`AGENTS.md`](AGENTS.md) defers here.
 
-Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here.
+Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
 Last updated: 2026-10-10 · Status: **P0.2 complete — FastAPI app + health endpoint green; P0.3 (local infra) up next**
 
@@ -178,14 +178,14 @@ For each slice the agent posts, in chat, one step at a time:
 2. **Concepts** — 3–6 bullets + official docs links for anything new (LangChain / LangGraph / FastAPI / pgvector / Next).
 3. **Code** — **ONE FILE PER MESSAGE**, complete file contents (not fragments), then **stop**. The owner types it, then replies `next` for the following file.
 4. **Verify** — exact commands + expected output, once all files of the slice are typed.
-5. **Quiz** — 3 questions: one fundamental, one tradeoff, one failure-mode. Owner answers before the slice closes.
+5. **Quiz (deferred — owner directive 2026-10-10):** the agent still writes the 3 questions (one fundamental, one tradeoff, one failure-mode) but **banks** them in [`docs/quiz-bank.md`](docs/quiz-bank.md); we answer them in **post-project review sessions** (or on demand — say "quiz me"). Time-crunch mode: slices don't wait on quiz answers.
 
 Rules:
 
 - The agent **never creates or edits files under `api/`, `web/`, or `infra/`** — all code lives in chat. It **may** update `docs/` and §11 of this file.
 - Modifications arrive as unified diffs or minimal before/after snippets — never full re-posts of already-typed files.
 - The owner may pause and ask `explain …` at any point; the agent explains before continuing.
-- A slice is done only when: **typed + verification green + quiz answered + committed**.
+- A slice is done only when: **typed + verification green + committed** (quizzes banked for post-project review — amendment 2026-10-10).
 - After each slice: agent updates §11 + any affected docs, then proposes the next slice.
 - Ambiguity → **ask**, don't guess.
 
@@ -354,6 +354,12 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - Quiz: lockfile-vs-direct-pin distinction solid; filled the gaps on app-factory benefits (test overrides, no import-time side effects) and the `ASGITransport` blind spot — in-process calls skip lifespan/startup hooks (a future DB-pool init needs a lifespan-aware test).
 - Editor note: basedpyright's `reportImplicitRelativeImport` misreads the pytest `pythonpath=["."]` layout; disabled editor-locally in gitignored `.vscode/settings.json`.
 - **Next: P0.3 — local infra (docker-compose pgvector + `.env.example`).**
+
+### 2026-10-10 — Workflow amendment: quiz step deferred (owner directive)
+
+- Time crunch: the 3-question quiz moves from per-slice to **post-project review**. Slices now close on **typed + verification green + committed**.
+- Questions are banked per slice in [`docs/quiz-bank.md`](docs/quiz-bank.md) (P0.2 included, 2 gaps marked for revisit); on-demand rounds anytime via "quiz me".
+- Interview-facing notes stay captured as we go (§11 + ADRs from P1), so the end-of-project discussion/interview pass stays cheap.
 
 ## 12. Docs map
 
