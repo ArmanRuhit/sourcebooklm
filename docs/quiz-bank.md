@@ -11,3 +11,9 @@
 3. **Failure mode** — The health test calls the app in-process (`ASGITransport`) and never starts a server. Name one real bug that would pass this test but break the real uvicorn server.
 
 *(P0.1 quiz was completed under the old workflow — no backlog.)*
+
+## P0.4 — web scaffold + CORS (banked 2026-10-10)
+
+1. **Fundamental** — Before the CORS patch, the browser page couldn't read `/api/v1/health` (it showed "Failed to fetch") while `curl` got a 200 from the same URL at the same time. Who enforces CORS, and what exactly did the middleware change about the API's *responses*?
+2. **Tradeoff** — `allow_origins=[WEB_ORIGIN]` allows exactly one origin vs `allow_origins=["*"]`. What does the wildcard buy you, and what must change once the app uses cookies/auth (why can't `*` and `allow_credentials=true` coexist)? Why did we deliberately skip `allow_credentials` for now?
+3. **Failure mode** — After deploying (Vercel web + Render api), someone forgets to point `WEB_ORIGIN` at the real web URL. The health card says "Unreachable: Failed to fetch" while the API uptime check is green. Explain why that symptom points at CORS, not at the API being down.

@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-10 · Status: **P0.3 complete — local Postgres 17 + pgvector up and verified; P0.4 (web scaffold) up next**
+Last updated: 2026-10-10 · Status: **P0.4 complete — Next 16 + shadcn web scaffold with live API health card (CORS on); P1.1 (schema + migrations) up next**
 
 ## 1. Mission & success criteria
 
@@ -215,7 +215,7 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 - [x] P0.1 Repo init: `git init`, `.gitignore`, folder skeleton, README placeholder, first commit
 - [x] P0.2 API scaffold: uv project, pinned deps, `/api/v1/health`, ruff + pytest green
 - [x] P0.3 Local infra: docker-compose pgvector, `.env.example`
-- [ ] P0.4 Web scaffold: Next 16 + Tailwind + shadcn, page showing API health
+- [x] P0.4 Web scaffold: Next 16 + Tailwind + shadcn, page showing API health
 
 *Exit:* `docker compose up -d` + `uv run uvicorn` serves health; `bun dev` shows it; both test/lint suites green.
 
@@ -369,6 +369,15 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - Verify green: `docker compose ps` → `sourcebooklm-db-1 … (healthy)`; in-container psql → PostgreSQL 17.11; `vector 0.8.7` listed as available → `CREATE EXTENSION` + `\dx` shows it. DB left running for P1.
 - Gitignore re-verified in a scratch repo: `api/.env.example` committable via the `!.env.example` negation; `api/.env` stays ignored.
 - **Next: P0.4 — web scaffold (Next 16 + Tailwind + shadcn, page showing API health).**
+
+### 2026-10-10 — P0.4 complete (web scaffold)
+
+- `web/`: `create-next-app@16.4.0` (Next 16.4.0 / React 19.3.0, TS, ESLint, Tailwind 4, App Router, `src/`, `@/*` alias, bun) + `shadcn@4.21.4 init` (base-nova preset, neutral, lucide, `cn` helper; theme tokens in `globals.css`).
+- `web/src/app/page.tsx`: client-side health card — fetches `${NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/v1/health`; union-typed state (`checking | ok | error`) + `cancelled` cleanup flag. Review caught a dark-mode color slip (`dark:text-green-400` → `dark:text-red-400`), fixed before commit.
+- `api/app/main.py`: `CORSMiddleware` with `allow_origins=[WEB_ORIGIN]` (localhost:3000 constant; TODO: move to settings in P1); no credentials until auth exists.
+- Verify green: curl shows `access-control-allow-origin: http://localhost:3000`; ruff + mypy + pytest (1 passed); browser renders **API: ok**; `bun run build` passes (Next 16 Turbopack).
+- Next 16 generates `web/AGENTS.md` (points agents at its bundled docs) — committed with the tree.
+- **Next: P1.1 — Alembic + initial migration (`CREATE EXTENSION vector` + 6 tables: notebooks, sources, source_files, source_contents, conversations, messages).**
 
 ## 12. Docs map
 
