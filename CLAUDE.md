@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-26 · Status: **P1.1 complete — schema migrated (6 tables + pgvector) and verified end-to-end; P1.2 (Notebooks CRUD API) up next**
+Last updated: 2026-10-26 · Status: **P1.2 in progress (checkpoint) — notebook schemas + service layer typed; router, endpoints, tests next**
 
 ## 1. Mission & success criteria
 
@@ -404,6 +404,15 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - **Verify evidence**: `alembic upgrade head` applies `001`; `\dt` shows 6 app tables + `alembic_version`; `alembic downgrade base` clean (only `alembic_version` remains); re-upgrade ok; `\dx` shows `vector 0.8.7`; `ruff check` / `ruff format --check` / `mypy` green; `pytest -q` → 2 passed.
 - Review nits caught by tooling pre-commit: I001 import grouping in `main.py`, a stray `from unittest import result` in `test_db.py`, a trailing-whitespace format pass — all auto-fixed.
 - **Next: P1.2 — Notebooks CRUD API** (schemas + service + router, tests against the docker DB).
+
+### 2026-10-26 — P1.2 in progress (checkpoint — session pause)
+
+- **Schemas**: `api/app/schemas.py` — `NotebookName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]`; `NotebookCreate` / `NotebookUpdate` (`name` only); `NotebookRead` with `from_attributes=True`. Lesson: an f-string is not a docstring (ruff `B021`) — and an f-string docstring containing `{notebook_id}` becomes an undefined-name error at import.
+- **Service layer**: `api/app/services/notebooks.py` — `create` / `list_all` (newest `updated_at` first) / `get` / `rename` / `delete`; no HTTP imports; commit + refresh after writes; deletes rely on DB `ON DELETE CASCADE`.
+- **Package markers**: `app/services/__init__.py`, `app/routers/__init__.py` created.
+- **Review catch**: `session.add(Notebook)` (the class) instead of `session.add(notebook)` (the instance) — a live runtime bug the formatter/linter can't see; fixed during wrap-up. Also removed the duplicate `schema.py` (kept `schemas.py`) and its stray f-string.
+- **Verify (after cleanup)**: ruff check + format green, mypy green, `pytest -q` → 2 passed (notebook endpoint tests arrive with the router).
+- **Next: P1.2 files 3–5** — `routers/notebooks.py` (5 endpoints, 201/204, `{detail}` 404s), `main.py` `include_router` diff, `tests/test_notebooks.py` (7 tests: happy path, 404s, 422 validation, 100-char boundary, cascade) → full verify + slice close.
 
 ## 12. Docs map
 
