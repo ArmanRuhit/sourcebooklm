@@ -17,3 +17,9 @@
 1. **Fundamental** — Before the CORS patch, the browser page couldn't read `/api/v1/health` (it showed "Failed to fetch") while `curl` got a 200 from the same URL at the same time. Who enforces CORS, and what exactly did the middleware change about the API's *responses*?
 2. **Tradeoff** — `allow_origins=[WEB_ORIGIN]` allows exactly one origin vs `allow_origins=["*"]`. What does the wildcard buy you, and what must change once the app uses cookies/auth (why can't `*` and `allow_credentials=true` coexist)? Why did we deliberately skip `allow_credentials` for now?
 3. **Failure mode** — After deploying (Vercel web + Render api), someone forgets to point `WEB_ORIGIN` at the real web URL. The health card says "Unreachable: Failed to fetch" while the API uptime check is green. Explain why that symptom points at CORS, not at the API being down.
+
+## P1.1 — schema + migrations (banked 2026-10-26)
+
+1. **Fundamental** — Alembic's `env.py` sets `target_metadata = Base.metadata`. What exactly does `--autogenerate` compare, and what happens if someone edits a column in `models.py` but ships no new migration?
+2. **Tradeoff** — Why does Alembic keep an `alembic_version` table and a chain of revisions instead of just running idempotent `CREATE TABLE IF NOT EXISTS` scripts at startup? What does the chain buy you on downgrade?
+3. **Failure mode** — A deploy ships the new API but `alembic upgrade head` never ran against the production DB (or a migration dies halfway). What breaks first, and why does PostgreSQL's transactional DDL make the halfway case safe?
