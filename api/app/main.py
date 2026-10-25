@@ -3,10 +3,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-API_PREFIX = "/api/v1"
+from app.config import settings
 
-# Web dev server origin allowed by CORS; TODO(P1): move to settings.
-WEB_ORIGIN = "http://localhost:3000"
+API_PREFIX = "/api/v1"
 
 
 def create_app() -> FastAPI:
@@ -14,7 +13,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[WEB_ORIGIN],
+        allow_origins=[settings.web_origin],
         allow_methods=["*"],
         allow_headers=["*"],
     )
