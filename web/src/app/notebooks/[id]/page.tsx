@@ -17,6 +17,7 @@ import { AddSourceDialog } from "@/components/sources/add-source-dialog";
 import { PdfViewerPanel } from "@/components/sources/pdf-viewer-panel";
 import { SourceList } from "@/components/sources/source-list";
 import { TextSourceViewer } from "@/components/sources/text-source-viewer";
+import { VttSourceViewer } from "@/components/sources/vtt-source-viewer";
 import { YoutubeSourceViewer } from "@/components/sources/youtube-source-viewer";
 import { Button } from "@/components/ui/button";
 import { useSources } from "@/hooks/use-sources";
@@ -28,6 +29,7 @@ import {
   getNotebook,
   getSourceFileUrl,
   uploadPdf,
+  uploadVtt,
   type Notebook,
   type Source,
 } from "@/lib/api";
@@ -189,6 +191,11 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
     addSource(source);
   }
 
+  async function handleUploadVtt(file: File) {
+    const source = await uploadVtt(notebook.id, file);
+    addSource(source);
+  }
+
   async function handleAddUrl(url: string) {
     const source = await createUrlSource(notebook.id, url);
     addSource(source);
@@ -295,6 +302,11 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
                   source={viewer.source}
                   initialStartSeconds={viewer.startSeconds}
                 />
+              ) : viewer.source.kind === "vtt" ? (
+                <VttSourceViewer
+                  key={viewer.source.id}
+                  source={viewer.source}
+                />
               ) : (
                 <TextSourceViewer
                   key={viewer.source.id}
@@ -311,6 +323,7 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
           open={addOpen}
           onOpenChange={setAddOpen}
           onUpload={handleUpload}
+          onUploadVtt={handleUploadVtt}
           onAddUrl={handleAddUrl}
           onAddYoutube={handleAddYoutube}
         />

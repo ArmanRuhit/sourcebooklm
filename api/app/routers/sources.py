@@ -29,6 +29,7 @@ notebook_sources_router = APIRouter(prefix="/notebooks", tags=["sources"])
 sources_router = APIRouter(prefix="/sources", tags=["sources"])
 
 PDF_MAGIC = b"%PDF-"
+VTT_MAGIC = b"WEBVTT"
 MAX_FILENAME_LENGTH = 255
 STREAM_CHUNK_SIZE = 64 * 1024
 
@@ -73,7 +74,7 @@ async def list_sources(notebook: NotebookDep, session: SessionDep) -> list[Sourc
 async def create_source(
     notebook: NotebookDep,
     session: SessionDep,
-    kind: Annotated[Literal["text", "pdf", "url", "youtube"], Form()],
+    kind: Annotated[Literal["text", "pdf", "url", "youtube", "vtt"], Form()],
     title: Annotated[str | None, Form()] = None,
     text: Annotated[str | None, Form()] = None,
     url: Annotated[str | None, Form()] = None,
@@ -136,6 +137,46 @@ async def create_source(
             video_id=video_id,
             url=f"https://www.youtube.com/watch?v={video_id}",
             title=youtube_payload.title,
+        )
+
+    if kind == "vtt":
+        if file is None or not file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="A VTT file is required",
+            )
+        if Path(file.filename).suffix.lower() != ".vtt":
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="File must be a .vtt transcript",
+            )
+
+        max_bytes = settings.max_upload_mb * 1024 * 1024
+        data = await file.read(max_bytes + 1)
+        if len(data) > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail=f"VTT must be {settings.max_upload_mb} MB or smaller",
+            )
+        if not data:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="The uploaded VTT is empty",
+            )
+        header = data[:1024].removeprefix(b"\xef\xbb\xbf").lstrip()
+        if not header.startswith(VTT_MAGIC):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="File must be a WebVTT (.vtt) file",
+            )
+
+        filename = Path(file.filename).name[-MAX_FILENAME_LENGTH:] or "transcript.vtt"
+        return await sources.create_vtt(
+            session,
+            notebook.id,
+            filename=filename,
+            data=data,
+            title=_clean_title(title),
         )
 
     if file is None or not file.filename:

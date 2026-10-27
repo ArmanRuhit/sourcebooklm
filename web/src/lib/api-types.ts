@@ -174,7 +174,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "text" | "pdf" | "url" | "youtube";
+            kind: "text" | "pdf" | "url" | "youtube" | "vtt";
             /** Title */
             title?: string | null;
             /** Text */

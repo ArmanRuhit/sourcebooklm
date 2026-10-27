@@ -7,41 +7,7 @@ import { useSourceContent } from "@/hooks/use-source-content";
 import type { Source } from "@/lib/api";
 import { cn } from "cn";
 import { formatTimestamp } from "@/lib/format";
-
-type Segment = {
-  text: string;
-  startSeconds: number;
-  endSeconds: number;
-};
-
-function readSegments(raw: unknown[] | null): Segment[] {
-  if (!raw) {
-    return [];
-  }
-
-  return raw.flatMap((item) => {
-    if (typeof item !== "object" || item === null) {
-      return [];
-    }
-
-    const record = item as Record<string, unknown>;
-    if (
-      typeof record.text !== "string" ||
-      typeof record.start_seconds !== "number" ||
-      typeof record.end_seconds !== "number"
-    ) {
-      return [];
-    }
-
-    return [
-      {
-        text: record.text,
-        startSeconds: record.start_seconds,
-        endSeconds: record.end_seconds,
-      },
-    ];
-  });
-}
+import { readSegments } from "@/lib/segments";
 
 export function YoutubeSourceViewer({
   source,

@@ -19,6 +19,7 @@ from app.services import vector_store
 from app.services.ingestion.chunker import Chunk, split_pages, split_text, split_transcript
 from app.services.ingestion.errors import IngestionError
 from app.services.ingestion.pdf import extract_pages
+from app.services.ingestion.vtt import parse_vtt
 from app.services.ingestion.web import fetch_article, fetch_transcript
 
 
@@ -82,6 +83,40 @@ async def _extract(state: IngestState) -> dict[str, Any]:
                 "final_url": video.url,
                 "video_id": video.video_id,
             }
+            await session.commit()
+
+            return {
+                "text": content.text,
+                "segments": segments,
+                "notebook_id": str(source.notebook_id),
+                "kind": source.kind,
+                "title": source.title,
+            }
+
+        if source.kind == "vtt":
+            uploaded = await session.get(SourceFile, source_id)
+            if uploaded is None:
+                raise IngestionError("Uploaded VTT file is missing")
+
+            cues = await run_in_threadpool(parse_vtt, uploaded.file_bytes)
+            segments = [
+                {
+                    "text": text,
+                    "start_seconds": start,
+                    "end_seconds": end,
+                }
+                for text, start, end in cues
+            ]
+            content = await session.get(SourceContent, source_id)
+            if content is None:
+                content = SourceContent(source_id=source_id)
+                session.add(content)
+            content.text = "\n".join(text for text, _, _ in cues)
+            content.pages = None
+            content.segments = segments
+
+            source.char_count = len(content.text)
+            source.stage = "chunking"
             await session.commit()
 
             return {

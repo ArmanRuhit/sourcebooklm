@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CaptionsIcon,
   FileStackIcon,
   FileTextIcon,
   Link2Icon,
@@ -42,6 +43,8 @@ function sourceMeta(source: Source): string {
     }
   } else if (source.kind === "youtube") {
     kindLabel = "YouTube";
+  } else if (source.kind === "vtt") {
+    kindLabel = "VTT";
   } else {
     kindLabel = "Text";
   }
@@ -113,7 +116,7 @@ export function SourceList({
           </div>
           <p className="text-sm font-medium">No sources yet</p>
           <p className="max-w-56 text-xs text-muted-foreground">
-            Upload a PDF or add an article or video link.
+            Upload a PDF or VTT, add an article, or paste a YouTube URL.
           </p>
           <Button size="sm" variant="outline" className="mt-2" onClick={onAdd}>
             <PlusIcon />
@@ -145,6 +148,8 @@ export function SourceList({
                       <Link2Icon className="size-4 text-muted-foreground" />
                     ) : source.kind === "youtube" ? (
                       <VideoIcon className="size-4 text-muted-foreground" />
+                    ) : source.kind === "vtt" ? (
+                      <CaptionsIcon className="size-4 text-muted-foreground" />
                     ) : (
                       <FileTextIcon className="size-4 text-muted-foreground" />
                     )}

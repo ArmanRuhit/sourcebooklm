@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-28 · Status: **P2.5 complete — YouTube URLs fetch English transcripts with timestamped chunks, an oEmbed title, and a seekable player/transcript viewer; P2.6 (VTT transcripts) up next**
+Last updated: 2026-10-28 · Status: **P2.6 complete — uploaded VTT files parse into timestamped cues and reuse the transcript chunk/index path, with a transcript viewer and original-file link; P2.7 (remove / re-index / failure UX) up next**
 
 ## 1. Mission & success criteria
 
@@ -235,7 +235,7 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 - [x] P2.3 PDF: upload, bytea storage, file serving, viewer opens at page
 - [x] P2.4 Website URL extraction
 - [x] P2.5 YouTube transcript extraction (timestamped segments)
-- [ ] P2.6 VTT transcript parsing
+- [x] P2.6 VTT transcript parsing
 - [ ] P2.7 Remove / re-index / failure states + status polling UI
 
 *Exit:* all five source types ingest to `ready` with correct metadata; delete removes vectors; failures visible + retryable.
@@ -493,6 +493,16 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - **Tests** (17 new, 77 total): URL-form parsing/rejections; source creation and config; mocked transcript pipeline success/failure with segment and vector metadata; timed-chunk packing, one-cue overlap, offsets, and empty-cue failure. `ruff check`, `ruff format --check`, `mypy` (23 files), and `pytest -q` are green.
 - **Manual evidence**: live ingest of `youtube.com/watch?v=jNQXAC9IVRw` reached `ready` in ~5 s with `chunk_count=1`, `char_count=217`, 6 segments, and title “Me at the zoo”. The viewer rendered the player + 6 cues; clicking `0:01` and `0:12` changed the iframe `start` parameter accordingly, with no console errors. Source deleted; list back to `[]`.
 - **Next: P2.6 — VTT transcript parsing** (timestamped cues, same chunk path, upload + viewer).
+
+### 2026-10-28 — P2.6 complete (VTT transcripts)
+
+- **Parser**: `services/ingestion/vtt.py` decodes UTF-8 (BOM allowed), requires the `WEBVTT` header, skips `NOTE`/`STYLE`/`REGION` blocks, handles cue identifiers and timestamp settings, strips inline tags, unescapes entities, and accepts both `MM:SS.mmm` and `HH:MM:SS.mmm`. Missing headers, bad timestamps, backwards cues, and empty files raise `IngestionError`; malformed uploads fail in the worker rather than at request time.
+- **Upload**: `POST /notebooks/{id}/sources` now accepts `kind=vtt` with a required `.vtt` file. It enforces the 20 MB cap (413), checks the `WEBVTT` magic (422), stores the original bytes in `source_files` as `text/vtt; charset=utf-8`, and falls back to the filename stem for the title. `GET /sources/{id}/file` streams it unchanged.
+- **Pipeline**: the VTT branch of `_extract` parses the stored bytes off the event loop, writes `source_contents.text` (newline-joined cues) and `segments`, sets `char_count`/stage `chunking`, then reuses `split_transcript` and the existing start/end metadata path. No new chunking or vector code.
+- **Web**: the VTT tile is live in the Add dialog with a `.vtt` file picker and 20 MB check; VTT rows show “VTT” and open a transcript viewer with cue timestamps, cue count, fallback text, and an `Open original` link. `readSegments` moved into `lib/segments.ts` so YouTube and VTT viewers share the same defensive parsing.
+- **Tests** (9 new, 86 total): parser cues/settings/markup/BOM/CRLF, malformed headers/timestamps/backwards cues/empty files, upload + streaming, `.txt`/wrong-magic/empty/missing/oversize rejection, a full VTT pipeline with segment + vector metadata, and a malformed file landing in `failed`. `ruff check`, `ruff format --check`, `mypy` (24 files), and `pytest -q` are green.
+- **Manual evidence**: live upload of a two-cue VTT reached `ready` in ~1 s with `chunk_count=1`, `char_count=101`, and segments `1.0–4.5` / `5.0–9.25`. The browser rendered “2 transcript cues”, both timestamps, and the original-file link; adding a second VTT through the dialog reached Ready via polling without a refresh, and its viewer showed “1 transcript cue”. Both smoke sources were deleted; the list returned to `[]`.
+- **Next: P2.7 — remove / re-index / failure UX** (delete action, retry, error states, polling polish).
 
 ## 12. Docs map
 

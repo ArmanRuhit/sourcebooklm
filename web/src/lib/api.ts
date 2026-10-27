@@ -119,6 +119,17 @@ export function uploadPdf(notebookId: string, file: File): Promise<Source> {
   });
 }
 
+export function uploadVtt(notebookId: string, file: File): Promise<Source> {
+  const body = new FormData();
+  body.append("kind", "vtt");
+  body.append("file", file);
+
+  return request<Source>(`/api/v1/notebooks/${notebookId}/sources`, {
+    method: "POST",
+    body,
+  });
+}
+
 export function createUrlSource(notebookId: string, url: string): Promise<Source> {
   const body = new FormData();
   body.append("kind", "url");

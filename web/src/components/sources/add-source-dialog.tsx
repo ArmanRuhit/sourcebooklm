@@ -66,14 +66,17 @@ const SOURCE_TILES: {
     label: "VTT",
     description: "Timestamped captions",
     icon: CaptionsIcon,
-    available: false,
+    available: true,
   },
 ];
+
+type FileKind = "pdf" | "vtt";
 
 type AddSourceDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpload: (file: File) => Promise<void>;
+  onUploadVtt: (file: File) => Promise<void>;
   onAddUrl: (url: string) => Promise<void>;
   onAddYoutube: (url: string) => Promise<void>;
 };
@@ -82,18 +85,24 @@ export function AddSourceDialog({
   open,
   onOpenChange,
   onUpload,
+  onUploadVtt,
   onAddUrl,
   onAddYoutube,
 }: AddSourceDialogProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const vttInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [fileKind, setFileKind] = useState<FileKind>("pdf");
   const [mode, setMode] = useState<"tiles" | "url" | "youtube">("tiles");
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [addingUrl, setAddingUrl] = useState(false);
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+  function handleFileChange(
+    event: ChangeEvent<HTMLInputElement>,
+    kind: FileKind,
+  ) {
     const selected = event.target.files?.[0] ?? null;
     event.target.value = "";
 
@@ -101,17 +110,21 @@ export function AddSourceDialog({
       return;
     }
 
-    if (!selected.name.toLowerCase().endsWith(".pdf")) {
-      setError("Choose a PDF file.");
+    const expectedExtension = kind === "vtt" ? ".vtt" : ".pdf";
+    if (!selected.name.toLowerCase().endsWith(expectedExtension)) {
+      setError(kind === "vtt" ? "Choose a .vtt file." : "Choose a PDF file.");
       return;
     }
 
     if (selected.size > MAX_UPLOAD_BYTES) {
-      setError("PDFs must be 20 MB or smaller.");
+      setError(
+        `${kind === "vtt" ? "VTT files" : "PDFs"} must be 20 MB or smaller.`,
+      );
       return;
     }
 
     setError(null);
+    setFileKind(kind);
     setFile(selected);
   }
 
@@ -124,7 +137,11 @@ export function AddSourceDialog({
     setError(null);
 
     try {
-      await onUpload(file);
+      if (fileKind === "vtt") {
+        await onUploadVtt(file);
+      } else {
+        await onUpload(file);
+      }
       onOpenChange(false);
     } catch (caught) {
       setError(getErrorMessage(caught));
@@ -171,16 +188,24 @@ export function AddSourceDialog({
         <DialogHeader>
           <DialogTitle>Add a source</DialogTitle>
           <DialogDescription>
-            Upload a PDF, add an article link, or paste a YouTube URL.
+            Upload a PDF or VTT, add an article link, or paste a YouTube URL.
           </DialogDescription>
         </DialogHeader>
 
         <input
-          ref={inputRef}
+          ref={pdfInputRef}
           type="file"
           accept="application/pdf,.pdf"
           className="sr-only"
-          onChange={handleFileChange}
+          onChange={(event) => handleFileChange(event, "pdf")}
+          tabIndex={-1}
+        />
+        <input
+          ref={vttInputRef}
+          type="file"
+          accept=".vtt,text/vtt"
+          className="sr-only"
+          onChange={(event) => handleFileChange(event, "vtt")}
           tabIndex={-1}
         />
 
@@ -248,7 +273,11 @@ export function AddSourceDialog({
           <div className="grid gap-3">
             <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-background">
-                <FileTextIcon className="size-5 text-muted-foreground" />
+                {fileKind === "vtt" ? (
+                  <CaptionsIcon className="size-5 text-muted-foreground" />
+                ) : (
+                  <FileTextIcon className="size-5 text-muted-foreground" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{file.name}</p>
@@ -282,7 +311,7 @@ export function AddSourceDialog({
                 ) : (
                   <UploadIcon />
                 )}
-                {uploading ? "Uploading..." : "Upload PDF"}
+                {uploading ? "Uploading..." : `Upload ${fileKind.toUpperCase()}`}
               </Button>
             </div>
           </div>
@@ -299,7 +328,9 @@ export function AddSourceDialog({
                     disabled={!tile.available}
                     onClick={() => {
                       if (tile.key === "pdf") {
-                        inputRef.current?.click();
+                        pdfInputRef.current?.click();
+                      } else if (tile.key === "vtt") {
+                        vttInputRef.current?.click();
                       } else if (tile.key === "url") {
                         setMode("url");
                         setError(null);

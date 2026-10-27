@@ -127,6 +127,38 @@ async def create_pdf(
     return source
 
 
+async def create_vtt(
+    session: AsyncSession,
+    notebook_id: uuid.UUID,
+    *,
+    filename: str,
+    data: bytes,
+    title: str | None = None,
+) -> Source:
+    """Insert a queued VTT source plus its original bytes."""
+    source = Source(
+        notebook_id=notebook_id,
+        kind="vtt",
+        title=title or _title_from_filename(filename),
+        config={"filename": filename, "size_bytes": len(data)},
+    )
+    session.add(source)
+    await session.flush()
+
+    session.add(
+        SourceFile(
+            source_id=source.id,
+            filename=filename,
+            content_type="text/vtt; charset=utf-8",
+            size_bytes=len(data),
+            file_bytes=data,
+        )
+    )
+    await session.commit()
+    await session.refresh(source)
+    return source
+
+
 async def list_for_notebook(session: AsyncSession, notebook_id: uuid.UUID) -> list[Source]:
     """Return a notebook's sources, newest first."""
     result = await session.scalars(

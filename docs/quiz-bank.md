@@ -71,3 +71,9 @@
 1. **Fundamental** — `split_transcript` never splits inside a cue and overlaps one cue between chunks. Why does that preserve citation quality, and what do `start_seconds`/`end_seconds` mean for a chunk that spans several cues?
 2. **Tradeoff** — The viewer embeds YouTube's player instead of storing or transcoding the video. What does that avoid (bandwidth, storage, licensing) and what does it give up (offline playback, control over availability, embed restrictions)?
 3. **Failure mode** — The oEmbed title lookup is best-effort while the transcript fetch is fatal. Why is that split correct, and what would users see if a title failure were treated like a transcript failure?
+
+## P2.6 — VTT transcripts (banked 2026-10-28)
+
+1. **Fundamental** — Why parse WebVTT into `(text, start, end)` cues instead of flattening the file to plain text and reusing the text chunker? Which later features become impossible if the timestamps are dropped?
+2. **Tradeoff** — The app stores both the original `.vtt` bytes in `source_files` and the derived `segments`/chunks. What does keeping the original buy for the viewer and re-indexing, and what does it cost in storage and write complexity?
+3. **Failure mode** — A file starts with `WEBVTT` but contains `00:00:02.000 --> 00:00:01.000`. The parser rejects it. Why not silently swap the endpoints, and where does the user see the consequence?
