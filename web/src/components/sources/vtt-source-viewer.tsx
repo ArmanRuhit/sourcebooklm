@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { CaptionsIcon, ExternalLinkIcon } from "lucide-react";
 
 import { useSourceContent } from "@/hooks/use-source-content";
@@ -7,8 +8,39 @@ import { getSourceFileUrl, type Source } from "@/lib/api";
 import { formatTimestamp } from "@/lib/format";
 import { readSegments } from "@/lib/segments";
 
-export function VttSourceViewer({ source }: { source: Source }) {
+type VttSourceViewerProps = {
+  source: Source;
+  highlightStart?: number | null;
+  highlightEnd?: number | null;
+};
+
+export function VttSourceViewer({
+  source,
+  highlightStart = null,
+  highlightEnd = null,
+}: VttSourceViewerProps) {
   const state = useSourceContent(source.id);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const segments =
+    state.status === "ready" ? readSegments(state.content.segments) : [];
+
+  const activeIndex =
+    highlightStart === null || highlightEnd === null
+      ? -1
+      : segments.findIndex(
+          (segment) =>
+            segment.endSeconds >= highlightStart &&
+            segment.startSeconds <= highlightEnd,
+        );
+
+  useEffect(() => {
+    if (state.status === "ready" && activeIndex >= 0) {
+      containerRef.current
+        ?.querySelector('[data-active="true"]')
+        ?.scrollIntoView({ block: "center" });
+    }
+  }, [state.status, activeIndex]);
 
   if (state.status === "loading") {
     return (
@@ -25,8 +57,6 @@ export function VttSourceViewer({ source }: { source: Source }) {
       </p>
     );
   }
-
-  const segments = readSegments(state.content.segments);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -48,12 +78,13 @@ export function VttSourceViewer({ source }: { source: Source }) {
       </div>
 
       {segments.length > 0 ? (
-        <div className="min-h-0 flex-1 overflow-auto p-2">
+        <div ref={containerRef} className="min-h-0 flex-1 overflow-auto p-2">
           <ol className="flex flex-col gap-0.5">
             {segments.map((segment, index) => (
               <li
                 key={`${segment.startSeconds}-${index}`}
-                className="flex items-start gap-2 rounded-md px-2 py-1.5 text-sm"
+                data-active={index === activeIndex}
+                className="flex items-start gap-2 rounded-md px-2 py-1.5 text-sm data-[active=true]:bg-amber-100/80"
               >
                 <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 text-[11px] tabular-nums text-muted-foreground">
                   <CaptionsIcon className="size-2.5" />

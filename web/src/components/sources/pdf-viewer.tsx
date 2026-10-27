@@ -17,9 +17,10 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 export type PdfViewerProps = {
   url: string;
   initialPage?: number;
+  snippet?: string | null;
 };
 
-export function PdfViewer({ url, initialPage = 1 }: PdfViewerProps) {
+export function PdfViewer({ url, initialPage = 1, snippet = null }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [numPages, setNumPages] = useState<number | null>(null);
@@ -74,6 +75,17 @@ export function PdfViewer({ url, initialPage = 1 }: PdfViewerProps) {
           </Button>
         </div>
       </div>
+
+      {snippet && (
+        <div className="border-b bg-amber-50 px-4 py-2.5">
+          <p className="text-[11px] font-medium tracking-wide text-amber-900 uppercase">
+            Cited passage
+          </p>
+          <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-amber-950">
+            {snippet}
+          </p>
+        </div>
+      )}
 
       <div ref={containerRef} className="min-h-0 flex-1 overflow-auto bg-muted/40 p-4">
         <Document

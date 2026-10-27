@@ -118,3 +118,41 @@ class SourceRead(BaseModel):
     config: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+
+class QueryRequest(BaseModel):
+    """Body for POST /notebooks/{id}/query."""
+
+    question: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=2000),
+    ]
+
+
+class Citation(BaseModel):
+    """One grounded chunk behind an answer."""
+
+    index: int
+    source_id: uuid.UUID
+    source_title: str
+    source_kind: str
+    chunk_index: int | None = None
+    page: int | None = None
+    start_seconds: float | None = None
+    end_seconds: float | None = None
+    char_start: int | None = None
+    char_end: int | None = None
+    snippet: str
+
+
+class MessageRead(BaseModel):
+    """A persisted user or assistant message."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    role: Literal["user", "assistant"]
+    content: str
+    citations: list[Citation] | None
+    model: str | None
+    created_at: datetime

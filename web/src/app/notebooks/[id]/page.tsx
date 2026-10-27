@@ -5,14 +5,13 @@ import { useParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   ArrowLeftIcon,
-  MessageSquareIcon,
   RefreshCwIcon,
   SearchXIcon,
-  SendIcon,
   XIcon,
 } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
+import { ChatPanel } from "@/components/chat/chat-panel";
 import { AddSourceDialog } from "@/components/sources/add-source-dialog";
 import { DeleteSourceDialog } from "@/components/sources/delete-source-dialog";
 import { PdfViewerPanel } from "@/components/sources/pdf-viewer-panel";
@@ -32,6 +31,7 @@ import {
   reindexSource,
   uploadPdf,
   uploadVtt,
+  type Citation,
   type Notebook,
   type Source,
 } from "@/lib/api";
@@ -194,7 +194,11 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
     source: Source;
     page: number;
     startSeconds: number;
+    citation: Citation | null;
   } | null>(null);
+
+  const readySourceCount =
+    sources?.filter((source) => source.status === "ready").length ?? 0;
 
   async function handleUpload(file: File) {
     const source = await uploadPdf(notebook.id, file);
@@ -236,6 +240,22 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
     setActionError(null);
   }
 
+  function handleCitation(citation: Citation) {
+    const source = sources?.find((item) => item.id === citation.source_id);
+
+    if (!source) {
+      setActionError("That cited source is no longer available.");
+      return;
+    }
+
+    setViewer({
+      source,
+      page: citation.page ?? 1,
+      startSeconds: citation.start_seconds ?? 0,
+      citation,
+    });
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeader />
@@ -273,41 +293,22 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
             onAdd={() => setAddOpen(true)}
             onRetry={reload}
             onOpen={(source) =>
-              setViewer({ source, page: 1, startSeconds: 0 })
+              setViewer({
+                source,
+                page: 1,
+                startSeconds: 0,
+                citation: null,
+              })
             }
             onReindex={handleReindex}
             onDelete={setDeletingSource}
           />
 
-          <section className="flex min-h-96 flex-col rounded-xl border bg-card">
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <h2 className="text-sm font-medium">Chat</h2>
-              <span className="text-xs text-muted-foreground">0 messages</span>
-            </div>
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-12 text-center">
-              <div className="flex size-11 items-center justify-center rounded-full bg-muted">
-                <MessageSquareIcon className="size-5 text-muted-foreground" />
-              </div>
-              <p className="text-sm font-medium">
-                Grounded answers will appear here
-              </p>
-              <p className="max-w-sm text-xs text-muted-foreground">
-                Add a source, then ask a question. Every answer will cite the
-                exact passage it came from.
-              </p>
-            </div>
-            <div className="border-t p-4">
-              <div className="flex items-center gap-2 rounded-lg border bg-muted/30 py-1.5 pr-1.5 pl-3">
-                <span className="flex-1 truncate text-sm text-muted-foreground">
-                  Ask a question about your sources...
-                </span>
-                <Button size="sm" disabled>
-                  <SendIcon />
-                  Send
-                </Button>
-              </div>
-            </div>
-          </section>
+          <ChatPanel
+            notebookId={notebook.id}
+            readySourceCount={readySourceCount}
+            onCitation={handleCitation}
+          />
 
           {viewer && (
             <section className="flex min-h-96 flex-col rounded-xl border bg-card">
@@ -329,6 +330,7 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
                   key={viewer.source.id}
                   url={getSourceFileUrl(viewer.source.id)}
                   initialPage={viewer.page}
+                  snippet={viewer.citation?.snippet}
                 />
               ) : viewer.source.kind === "youtube" ? (
                 <YoutubeSourceViewer
@@ -340,11 +342,16 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
                 <VttSourceViewer
                   key={viewer.source.id}
                   source={viewer.source}
+                  highlightStart={viewer.citation?.start_seconds}
+                  highlightEnd={viewer.citation?.end_seconds}
                 />
               ) : (
                 <TextSourceViewer
                   key={viewer.source.id}
                   source={viewer.source}
+                  highlightStart={viewer.citation?.char_start}
+                  highlightEnd={viewer.citation?.char_end}
+                  snippet={viewer.citation?.snippet}
                 />
               )}
             </section>

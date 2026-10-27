@@ -56,6 +56,46 @@ export interface paths {
         patch: operations["rename_notebook_api_v1_notebooks__notebook_id__patch"];
         trace?: never;
     };
+    "/api/v1/notebooks/{notebook_id}/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Query Notebook
+         * @description Stream a grounded answer as Server-Sent Events.
+         */
+        post: operations["query_notebook_api_v1_notebooks__notebook_id__query_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notebooks/{notebook_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Messages
+         * @description Return the notebook's conversation history, oldest first.
+         */
+        get: operations["list_messages_api_v1_notebooks__notebook_id__messages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notebooks/{notebook_id}/sources": {
         parameters: {
             query?: never;
@@ -204,10 +244,68 @@ export interface components {
             /** File */
             file?: string | null;
         };
+        /**
+         * Citation
+         * @description One grounded chunk behind an answer.
+         */
+        Citation: {
+            /** Index */
+            index: number;
+            /**
+             * Source Id
+             * Format: uuid
+             */
+            source_id: string;
+            /** Source Title */
+            source_title: string;
+            /** Source Kind */
+            source_kind: string;
+            /** Chunk Index */
+            chunk_index?: number | null;
+            /** Page */
+            page?: number | null;
+            /** Start Seconds */
+            start_seconds?: number | null;
+            /** End Seconds */
+            end_seconds?: number | null;
+            /** Char Start */
+            char_start?: number | null;
+            /** Char End */
+            char_end?: number | null;
+            /** Snippet */
+            snippet: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * MessageRead
+         * @description A persisted user or assistant message.
+         */
+        MessageRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Content */
+            content: string;
+            /** Citations */
+            citations: components["schemas"]["Citation"][] | null;
+            /** Model */
+            model: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * NotebookCreate
@@ -247,6 +345,14 @@ export interface components {
         NotebookUpdate: {
             /** Name */
             name: string;
+        };
+        /**
+         * QueryRequest
+         * @description Body for POST /notebooks/{id}/query.
+         */
+        QueryRequest: {
+            /** Question */
+            question: string;
         };
         /**
          * SourceContentRead
@@ -471,6 +577,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotebookRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    query_notebook_api_v1_notebooks__notebook_id__query_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebook_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_messages_api_v1_notebooks__notebook_id__messages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebook_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageRead"][];
                 };
             };
             /** @description Validation Error */

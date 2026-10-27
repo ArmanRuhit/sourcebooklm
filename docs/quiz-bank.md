@@ -83,3 +83,9 @@
 1. **Fundamental** — Re-index deletes the source's vectors before setting it `queued`, and the indexing step deletes again before adding. What invariant does that establish, and why is the second delete necessary for repeated or concurrent runs?
 2. **Tradeoff** — Delete is a hard delete: rows cascade and vectors are removed immediately, with no soft-delete or undo. What does that simplify (queries never filter tombstones, storage is reclaimed) and what does it cost (accidental loss, no audit trail)?
 3. **Failure mode** — The re-index endpoint returns 409 while a source is `processing` instead of queueing another run. What could happen if it accepted the request, and how does the `FOR UPDATE SKIP LOCKED` claim interact with that guard?
+
+## P3 — grounded streaming chat (banked 2026-10-28)
+
+1. **Fundamental** — Why does the SSE stream send `meta` and `citations` before any `token`, and why persist the user message before calling the LLM? What client and server behaviors does that ordering make possible when the connection drops mid-answer?
+2. **Tradeoff** — Retrieval fetches 12 candidates but MMR returns only 6 to the prompt. Why not pass the top 6 by similarity? What does diversity buy for multi-part questions, and what does it cost in prompt size and relevance?
+3. **Failure mode** — The model writes `[1]`, but citation metadata is produced by the app. Why must the app resolve `n` against the pre-built citation array instead of trusting any source ID the model might emit, and what would break if that array were reordered after generation?

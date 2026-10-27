@@ -6,6 +6,8 @@ const API_URL = (
 
 export type Notebook = components["schemas"]["NotebookRead"];
 export type Source = components["schemas"]["SourceRead"];
+export type Citation = components["schemas"]["Citation"];
+export type ChatMessage = components["schemas"]["MessageRead"];
 export type SourceContent = components["schemas"]["SourceContentRead"];
 
 export class ApiError extends Error {
@@ -163,6 +165,34 @@ export function getSourceContent(sourceId: string): Promise<SourceContent> {
 
 export function getSourceFileUrl(sourceId: string): string {
   return `${API_URL}/api/v1/sources/${sourceId}/file`;
+}
+
+export function getMessages(notebookId: string): Promise<ChatMessage[]> {
+  return request<ChatMessage[]>(`/api/v1/notebooks/${notebookId}/messages`, {
+    cache: "no-store",
+  });
+}
+
+export async function queryNotebook(
+  notebookId: string,
+  question: string,
+  signal: AbortSignal,
+): Promise<Response> {
+  const response = await fetch(
+    `${API_URL}/api/v1/notebooks/${notebookId}/query`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+      signal,
+    },
+  );
+
+  if (!response.ok) {
+    throw new ApiError(response.status, await readErrorDetail(response));
+  }
+
+  return response;
 }
 
 export async function deleteSource(sourceId: string): Promise<void> {

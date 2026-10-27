@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-28 · Status: **P2.7 complete — sources can be re-indexed, deleted (rows + vectors), and failed jobs retried, with 2s status polling; Phase 2 is closed and P3.1 (retriever) is up next**
+Last updated: 2026-10-28 · Status: **Phase 3 complete — grounded streaming chat with citations, history hydration, and per-source deep links; P4.1 (retrieval evals) up next**
 
 ## 1. Mission & success criteria
 
@@ -242,11 +242,11 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 
 ### Phase 3 — RAG chat (P3) — *rubric items 4 (15) and part of 3, 5*
 
-- [ ] P3.1 Retriever module (notebook-filtered similarity search) + tests
-- [ ] P3.2 Streaming query endpoint: SSE + citation prompt + citation payload
-- [ ] P3.3 Chat UI: streaming render, Markdown, citation chips
-- [ ] P3.4 Citation deep-links into the source viewer (all five types, MVP fidelity)
-- [ ] P3.5 Conversation history + grounding polish (refusals, errors)
+- [x] P3.1 Retriever module (notebook-filtered similarity search) + tests
+- [x] P3.2 Streaming query endpoint: SSE + citation prompt + citation payload
+- [x] P3.3 Chat UI: streaming render, Markdown, citation chips
+- [x] P3.4 Citation deep-links into the source viewer (all five types, MVP fidelity)
+- [x] P3.5 Conversation history + grounding polish (refusals, errors)
 
 *Exit:* ask → streamed grounded answer → clickable citations; history persists across reloads.
 
@@ -513,6 +513,17 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - **Tests** (5 new, 91 total): re-index twice with unique vectors; API delete removes vectors and GET 404s; 409 while processing; failed → retry → ready; missing source 404. `ruff check`, `ruff format --check`, `mypy` (24 files), and `pytest -q` are green.
 - **Manual evidence**: a ready text source re-indexed through the UI (`Queued` → `Ready`), then delete confirmed removal (API list `[]`, vector count 0). A bad URL produced `failed` with “Could not resolve that URL's host”; Retry returned it to `Queued` and back to `failed` with the same message, with no console errors. Smoke source deleted afterward.
 - **Next: P3.1 — retriever module** (notebook-filtered similarity search k=12 → MMR → 6, tests).
+
+### 2026-10-28 — Phase 3 complete (grounded streaming chat)
+
+- **Retriever**: `services/rag/retriever.py` embeds the question, fetches 12 candidates filtered by `notebook_id`, and applies MMR with `lambda=0.5` to return 6. Blank questions short-circuit to `[]`; tests prove relevant chunks come back and another notebook's chunks never leak.
+- **Streaming API**: `POST /api/v1/notebooks/{id}/query` emits `meta → citations → token* → done` (or `error`), implemented with `sse-starlette`. Citations are built from chunk metadata before generation, so the model can only refer to numbered context blocks; `[n]` is resolved by the app, never trusted from generated source IDs. The user message is persisted before the LLM call, and the assistant message + citation snapshot after it, so a dropped stream still leaves a recoverable transcript.
+- **Grounding**: the system prompt requires context-only answers, `[n]` on every claim, and refusal when retrieval is empty. `GET /api/v1/notebooks/{id}/messages` returns the lazily-created conversation history. Provider selection is env-driven (`openai`/`deepseek`) with model names from config.
+- **Chat UI**: `useChat` consumes the SSE body through `fetch` (not `EventSource`, so POST bodies and abort work), updates optimistic messages, supports Stop via `AbortController`, and hydrates history on mount. `ChatPanel` renders Markdown with `react-markdown` + GFM, inline `CitationChip`s, citation summary buttons, auto-scroll, and inline error banners; the composer supports Enter/Shift+Enter.
+- **Citation deep links**: the chat passes the full citation to the workspace viewer. Text/URL sources highlight `char_start`–`char_end` with `<mark>` (plus a cited-passage banner); VTT highlights the overlapping cue and scrolls to it; PDF opens `page` and shows the snippet; YouTube seek already used `start_seconds`.
+- **Tests** (7 new, 98 total): retriever relevance, notebook isolation, blank query; SSE event order/shape, empty-notebook refusal, mocked token stream + persisted citation, validation and missing-notebook errors. `ruff check`, `ruff format --check`, `mypy` (29 files), and `pytest -q` are green.
+- **Live evidence**: a real text source produced a streamed `gpt-5-mini` answer citing `[1]`; `GET /messages` showed both persisted messages. Reloading the notebook hydrated “2 messages”; a new question streamed to “4 messages”; clicking `[1]` opened the text viewer with the snippet and a `<mark>` over the cited chunk. A fresh empty notebook returned the refusal token, persisted it with `citations=[]`, then deleted cleanly. Smoke source/conversation removed afterward.
+- **Next: P4.1 — retrieval eval harness** (seed fixture notebook, 12–15 Q→expected-source pairs, record hit@k baseline).
 
 ## 12. Docs map
 

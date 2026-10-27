@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import notebooks, sources
+from app.routers import notebooks, query, sources
 from app.services import vector_store
 from app.services.ingestion import worker
 
@@ -46,6 +46,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(notebooks.router, prefix=API_PREFIX)
+    app.include_router(query.router, prefix=API_PREFIX)
     app.include_router(sources.notebook_sources_router, prefix=API_PREFIX)
     app.include_router(sources.sources_router, prefix=API_PREFIX)
 
