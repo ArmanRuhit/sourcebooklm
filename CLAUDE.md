@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-28 · Status: **P1.2 complete — notebook CRUD API live (5 endpoints, 9 tests green); P1.3 (Notebooks UI) up next**
+Last updated: 2026-10-28 · Status: **P1.3 complete — notebooks UI live (list/create/rename/delete, empty + loading + error states); P1.4 (notebook shell) up next**
 
 ## 1. Mission & success criteria
 
@@ -223,7 +223,7 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 
 - [x] P1.1 Schema + migrations: all tables + pgvector extension
 - [x] P1.2 Notebooks CRUD API + tests
-- [ ] P1.3 Notebooks UI (list, create, rename, delete, empty state) + generated API types
+- [x] P1.3 Notebooks UI (list, create, rename, delete, empty state) + generated API types
 - [ ] P1.4 Notebook page shell (sources panel + chat area placeholders)
 
 *Exit:* full notebook CRUD from the browser, persisted in Postgres, typed API client wired.
@@ -422,6 +422,15 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - **Verify evidence**: `pytest -q` → 9 passed; `mypy` → 10 source files; `ruff check` green (one indent nit in the new test file reformatted); live curl smoke on port 8000: POST 201 (name stripped) → GET list/one 200 → PATCH 200 → DELETE 204 → GET 404.
 - Review catches: duplicate `schema.py` twin removed; f-string "docstrings" converted (`{id}` would import-error); `session.add(Notebook)` class-vs-instance bug fixed at checkpoint.
 - **Next: P1.3 — Notebooks UI** (list/create/rename/delete pages + generated TS client via `openapi-typescript`).
+
+### 2026-10-28 — P1.3 complete (notebooks UI)
+
+- **Typed client**: `web/src/lib/api-types.ts` generated from the live `/openapi.json`; `web/src/lib/api.ts` wraps fetch with `ApiError` (parses FastAPI `{detail}`, handles 204), `list/create/rename/delete` notebooks. Fixed three bugs in the hand-typed first pass: template literal missing `$` before `{API_URL}` (relative URL), default port `8080`, and DELETE carrying a `{name}` body.
+- **UI**: `/notebooks` list with a four-state machine (`loading` skeleton → `error` + retry → `empty` CTA → `ready` grid); shared `NotebookNameDialog` for create + rename; `DeleteNotebookDialog` confirm; `NotebookCard` with icon actions; `AppHeader`; root `/` now redirects to `/notebooks` and the P0.4 health card is retired.
+- **State-reset pattern**: React's `set-state-in-effect` lint rule rejected resetting dialog state in effects — dialogs now mount only while open, so a remount gives a clean form (create) or the current name (rename).
+- **Verify evidence**: `bun run lint` clean · `bunx tsc --noEmit` clean · `bun run build` green (routes `/`, `/_not-found`, `/notebooks`) · browser pass: empty state → create → rename → delete → empty again, API confirmed `[]`; 3 seeded notebooks survive reload; no console errors.
+- Next 16.4.0 prints a security-advisory upgrade nudge on each fresh `next build` / `next dev`; deferred because the stack is pinned in §5 — revisit deliberately at P6.1.
+- **Next: P1.4 — Notebook page shell** (route `/notebooks/[id]`; sources panel + chat area placeholders; unknown id → not found; stacked on mobile).
 
 ## 12. Docs map
 

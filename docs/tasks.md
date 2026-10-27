@@ -60,7 +60,7 @@ Slice IDs match the roadmap exactly (`P<phase>.<n>`). Checkboxes live in CLAUDE.
 
 ### P1.3 — Notebooks UI
 - **Goal**: manage notebooks from the browser.
-- **Deliverables**: notebooks list page; create dialog; inline rename; delete confirm; empty state; typed API client generated from OpenAPI (`openapi-typescript`).
+- **Deliverables**: notebooks list page; create dialog; rename dialog; delete confirm; empty state; typed API client generated from OpenAPI (`openapi-typescript`).
 - **Acceptance criteria**: full CRUD via UI persists across refresh; empty state visible with zero notebooks; no `any` in client types.
 - **Verify**: manual browser pass · `bun run build` · `bunx tsc --noEmit`.
 - **Depends**: P1.2.

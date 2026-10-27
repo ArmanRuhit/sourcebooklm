@@ -29,3 +29,9 @@
 1. **Fundamental** — `NotebookName` uses `StringConstraints(strip_whitespace=True, min_length=1, max_length=100)`. For `{"name": "   "}`, where is it rejected, and why does strip-before-min_length turn a whitespace-only name into a 422 instead of an empty-named notebook?
 2. **Tradeoff** — Services return ORM `Notebook` objects and the router declares `response_model=NotebookRead` with `from_attributes=True`. What does that shortcut cost you (what does the router now depend on), and why does `from_attributes` keep the door open to return dicts/dataclasses later?
 3. **Failure mode** — `test_delete_notebook_cascades` only passes because of the DB-level `ON DELETE CASCADE` on `sources.notebook_id`. If that clause were dropped, what would the API's DELETE return instead of 204 — and why would an orphan-row outcome be worse than an error?
+
+## P1.3 — notebooks UI (banked 2026-10-28)
+
+1. **Fundamental** — `request<T>` returns `undefined as T` for a 204 and otherwise casts `response.json()`. Where does the type system stop protecting you, and what would a `deleteNotebook` caller see if the API started returning `200 {"deleted": true}` instead of 204?
+2. **Tradeoff** — Create/rename dialogs are mounted only while open, so each open starts from fresh `useState`. What does that pattern buy over keeping them mounted + resetting fields in an effect, and what does it cost (think exit animation, in-progress form state, focus)?
+3. **Failure mode** — The first typed client had `` fetch(`{API_URL}${path}`) `` (missing `$`) and `Content-Type: application/json` on GETs. Trace what the browser actually requests and why the failure surfaces as a `Request failed` toast instead of CORS/network noise.
