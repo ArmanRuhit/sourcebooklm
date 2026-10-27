@@ -41,3 +41,9 @@
 1. **Fundamental** — A request to `/notebooks/not-a-real-id` returns 422, not 404, because FastAPI validates the `UUID` path param before the handler runs. Why does the page map both 404 and 422 to "missing", and what does that say about the only input this route accepts?
 2. **Tradeoff** — The page fetches in a client effect and renders its own missing state, instead of being a server component that calls `getNotebook()` and `notFound()`. What do you gain (loading/retry UX, no server-side API origin coupling, simple client cache behavior) and what do you lose (real 404 HTTP status, server-rendered notebook name, one extra round trip after hydration)?
 3. **Failure mode** — The fetch effect depends on `[id, reloadKey]`. If someone removes `id` from the dependency array, what happens when the user navigates from notebook A to notebook B through a client-side link, and why would the URL and the displayed name disagree?
+
+## P2.1 — source API + worker skeleton (banked 2026-10-28)
+
+1. **Fundamental** — `claim_next` selects a row `FOR UPDATE SKIP LOCKED`, flips it to `processing`, and commits before the pipeline runs. Why release the lock immediately instead of holding it for the whole job, and what makes the claim safe without that lock?
+2. **Tradeoff** — The `sources` table is the queue: no Redis, no Celery. What does that buy (one datastore, transactional status changes, simple deploy) and what does it cost at higher scale (polling, idle connections, no retry/priority features, worker count limits)?
+3. **Failure mode** — A worker dies after committing `status='processing'` but before finishing. Trace the recovery: what does `requeue_stale` change, why is that safe to run at every startup, and what would happen to the source if no startup requeue existed?

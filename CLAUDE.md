@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-28 · Status: **P1.4 complete — notebook workspace shell live (sources + chat placeholders, not-found + retry states); P2.1 (source API + worker skeleton) up next**
+Last updated: 2026-10-28 · Status: **P2.1 complete — source API + worker skeleton live (text sources reach `ready`, crash requeue, `SKIP LOCKED` claims); P2.2 (text → chunk → embed → index) up next**
 
 ## 1. Mission & success criteria
 
@@ -230,7 +230,7 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 
 ### Phase 2 — Ingestion pipeline (P2) — *rubric item 2 (20)*
 
-- [ ] P2.1 Source API + worker skeleton (status machine, claim loop, crash recovery)
+- [x] P2.1 Source API + worker skeleton (status machine, claim loop, crash recovery)
 - [ ] P2.2 Text source end-to-end: chunk → embed → pgvector → `ready`
 - [ ] P2.3 PDF: upload, bytea storage, file serving, viewer opens at page
 - [ ] P2.4 Website URL extraction
@@ -439,6 +439,16 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - **Next 16 Cache Components**: `useParams()` in a client component must sit under `<Suspense>`; split the page into `NotebookPage` (Suspense wrapper) + `NotebookPageContent`. Base UI's `Button render={<Link/>}` also needs `nativeButton={false}` so the anchor keeps link semantics and the console stays clean.
 - **Verify evidence**: `bun run lint` clean · `bunx tsc --noEmit` clean · `bun run build` green (`/notebooks/[id]` = Partial Prerender) · browser pass: card → shell, valid-but-unknown UUID → "Notebook not found", malformed id → same, back button → list; narrow viewport stacks panels; no JS exceptions (only the expected 404/422 resource logs).
 - **Next: P2.1 — Source API + worker skeleton** (status machine, `FOR UPDATE SKIP LOCKED` claim loop, startup requeue, stub text processor, tests).
+
+### 2026-10-28 — P2.1 complete (source API + worker skeleton)
+
+- **API**: `GET/POST /api/v1/notebooks/{id}/sources`, `GET/DELETE /api/v1/sources/{id}`. Create is a multipart form (`python-multipart` added) validated by `SourceCreate`; P2.1 widens `kind` to `text` only, so later kinds arrive with their extractors. Text is stored in `source_contents` at create time (extraction is a passthrough); the title falls back to the first non-empty line.
+- **Shared deps**: `routers/deps.py` now owns `SessionDep`, `get_notebook_or_404`, and `NotebookDep`; the notebooks router was simplified to use them, so sources get the same 404 behavior without copy-paste.
+- **Worker**: `services/ingestion/worker.py` uses the `sources` table as the queue — claim the oldest `queued` row with `FOR UPDATE SKIP LOCKED`, flip to `processing`/`extracting`, commit (releasing the lock), then walk `chunking → embedding → indexing → ready`. Failures land in `failed` + `error`; the loop logs and survives. Startup requeues every stale `processing` row before the polling task starts.
+- **Lifespan**: `main.py` runs requeue + `run_worker()` as an app-lifespan task and cancels it cleanly on shutdown. `process_next()` is directly testable without a server.
+- **Tests** (12 new, 21 total): source CRUD + default title + 404s + validation (empty text, wrong kind, 201-char title); worker ready path/`char_count`, requeue recovery, failure without content, concurrent claims distinct, and a held row lock proving `SKIP LOCKED` returns nothing. All green: `ruff check` + `ruff format --check` + `mypy` (15 files) + `pytest -q`.
+- **Manual evidence**: multipart POST → `queued`; poll → `ready`, `char_count=77`. Inserted a `processing`/`embedding` row, restarted the API; log showed `requeued 1 interrupted source(s)` and the source reached `ready` (`char_count=34`). Regenerated `web/src/lib/api-types.ts` from the expanded OpenAPI schema (242 lines added); `tsc --noEmit` clean.
+- **Next: P2.2 — text end-to-end** (recursive chunker 1000/150, OpenAI embeddings, PGVector `chunks` init + HNSW, metadata, `chunk_count`, search smoke script).
 
 ## 12. Docs map
 

@@ -56,6 +56,54 @@ export interface paths {
         patch: operations["rename_notebook_api_v1_notebooks__notebook_id__patch"];
         trace?: never;
     };
+    "/api/v1/notebooks/{notebook_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sources
+         * @description List a notebook's sources, newest first.
+         */
+        get: operations["list_sources_api_v1_notebooks__notebook_id__sources_get"];
+        put?: never;
+        /**
+         * Create Source
+         * @description Add a text source; the worker picks it up from the queue.
+         */
+        post: operations["create_source_api_v1_notebooks__notebook_id__sources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sources/{source_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Source
+         * @description Get one source.
+         */
+        get: operations["get_source_api_v1_sources__source_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Source
+         * @description Delete a source and everything derived from it.
+         */
+        delete: operations["delete_source_api_v1_sources__source_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -123,6 +171,74 @@ export interface components {
         NotebookUpdate: {
             /** Name */
             name: string;
+        };
+        /**
+         * SourceCreate
+         * @description Multipart form fields for POST /notebooks/{id}/sources.
+         *
+         *     P2.1 accepts text only; each later source kind widens the literal and
+         *     adds its own payload fields.
+         */
+        SourceCreate: {
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "text";
+            /** Title */
+            title?: string | null;
+            /** Text */
+            text: string;
+        };
+        /**
+         * SourceRead
+         * @description Source as returned by the API.
+         */
+        SourceRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Notebook Id
+             * Format: uuid
+             */
+            notebook_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "pdf" | "text" | "url" | "youtube" | "vtt";
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "processing" | "ready" | "failed";
+            /** Stage */
+            stage: ("extracting" | "chunking" | "embedding" | "indexing") | null;
+            /** Error */
+            error: string | null;
+            /** Chunk Count */
+            chunk_count: number | null;
+            /** Char Count */
+            char_count: number | null;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -282,6 +398,132 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["NotebookRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sources_api_v1_notebooks__notebook_id__sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebook_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_source_api_v1_notebooks__notebook_id__sources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notebook_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["SourceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_source_api_v1_sources__source_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_source_api_v1_sources__source_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
