@@ -8,6 +8,8 @@ from sqlalchemy import select
 from app.db import async_session_factory
 from app.models import Notebook, Source, SourceContent
 from app.services.ingestion import worker
+from app.services.vector_store import delete_source, search_chunks
+from tests.helpers import FakeEmbeddings
 
 
 @pytest.fixture
@@ -20,6 +22,14 @@ async def notebook_id() -> AsyncIterator[uuid.UUID]:
         notebook_id = notebook.id
 
     yield notebook_id
+
+    # Remove vectors before the notebook cascades its source rows away.
+    async with async_session_factory() as session:
+        source_ids = list(
+            await session.scalars(select(Source.id).where(Source.notebook_id == notebook_id))
+        )
+    for source_id in source_ids:
+        await delete_source(str(source_id))
 
     async with async_session_factory() as session:
         notebook = await session.get(Notebook, notebook_id)
@@ -54,7 +64,7 @@ async def _create_source(
 async def test_process_next_marks_text_source_ready(notebook_id: uuid.UUID) -> None:
     source_id = await _create_source(notebook_id, text="Hello worker")
 
-    assert await worker.process_next() is True
+    assert await worker.process_next(embeddings=FakeEmbeddings()) is True
 
     async with async_session_factory() as session:
         source = await session.get(Source, source_id)
@@ -63,7 +73,7 @@ async def test_process_next_marks_text_source_ready(notebook_id: uuid.UUID) -> N
         assert source.stage is None
         assert source.error is None
         assert source.char_count == len("Hello worker")
-        assert source.chunk_count is None
+        assert source.chunk_count == 1
 
 
 async def test_requeue_recovers_interrupted_source(notebook_id: uuid.UUID) -> None:
@@ -76,7 +86,7 @@ async def test_requeue_recovers_interrupted_source(notebook_id: uuid.UUID) -> No
         assert source.status == "queued"
         assert source.stage is None
 
-    assert await worker.process_next() is True
+    assert await worker.process_next(embeddings=FakeEmbeddings()) is True
 
     async with async_session_factory() as session:
         source = await session.get(Source, source_id)
@@ -112,7 +122,7 @@ async def test_concurrent_claims_are_distinct(notebook_id: uuid.UUID) -> None:
 async def test_failure_marks_source_failed(notebook_id: uuid.UUID) -> None:
     source_id = await _create_source(notebook_id, with_content=False)
 
-    assert await worker.process_next() is True
+    assert await worker.process_next(embeddings=FakeEmbeddings()) is True
 
     async with async_session_factory() as session:
         source = await session.get(Source, source_id)
@@ -121,3 +131,21 @@ async def test_failure_marks_source_failed(notebook_id: uuid.UUID) -> None:
         assert source.stage is None
         assert source.error is not None
         assert "No text content" in source.error
+
+
+async def test_pipeline_indexes_searchable_chunks(notebook_id: uuid.UUID) -> None:
+    source_id = await _create_source(notebook_id, text="alpha beta gamma delta")
+    embeddings = FakeEmbeddings()
+
+    try:
+        assert await worker.process_next(embeddings=embeddings) is True
+
+        results = await search_chunks(
+            str(notebook_id),
+            "alpha beta",
+            k=5,
+            embeddings=embeddings,
+        )
+        assert any(document.metadata["source_id"] == str(source_id) for document, _ in results)
+    finally:
+        await delete_source(str(source_id))

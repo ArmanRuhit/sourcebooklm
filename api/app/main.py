@@ -1,6 +1,7 @@
 """SourcebookLM API - app factory and entry point."""
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
@@ -9,14 +10,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.routers import notebooks, sources
+from app.services import vector_store
 from app.services.ingestion import worker
 
 API_PREFIX = "/api/v1"
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    """Recover interrupted jobs, then run the ingestion worker with the app."""
+    """Prepare the vector store, recover jobs, then run the worker."""
+    try:
+        await vector_store.ensure_vector_store()
+    except vector_store.EmbeddingConfigError as exc:
+        logger.warning("vector store unavailable: %s", exc)
+
     await worker.startup()
     task = asyncio.create_task(worker.run_worker(), name="ingestion-worker")
     try:

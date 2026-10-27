@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-28 · Status: **P2.1 complete — source API + worker skeleton live (text sources reach `ready`, crash requeue, `SKIP LOCKED` claims); P2.2 (text → chunk → embed → index) up next**
+Last updated: 2026-10-28 · Status: **P2.2 complete — text pipeline live (chunk 1000/150, LangGraph extract→chunk→embed, PGVector + HNSW, notebook-filtered search); P2.3 (PDF upload + viewer) up next**
 
 ## 1. Mission & success criteria
 
@@ -231,7 +231,7 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 ### Phase 2 — Ingestion pipeline (P2) — *rubric item 2 (20)*
 
 - [x] P2.1 Source API + worker skeleton (status machine, claim loop, crash recovery)
-- [ ] P2.2 Text source end-to-end: chunk → embed → pgvector → `ready`
+- [x] P2.2 Text source end-to-end: chunk → embed → pgvector → `ready`
 - [ ] P2.3 PDF: upload, bytea storage, file serving, viewer opens at page
 - [ ] P2.4 Website URL extraction
 - [ ] P2.5 YouTube transcript extraction (timestamped segments)
@@ -449,6 +449,18 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - **Tests** (12 new, 21 total): source CRUD + default title + 404s + validation (empty text, wrong kind, 201-char title); worker ready path/`char_count`, requeue recovery, failure without content, concurrent claims distinct, and a held row lock proving `SKIP LOCKED` returns nothing. All green: `ruff check` + `ruff format --check` + `mypy` (15 files) + `pytest -q`.
 - **Manual evidence**: multipart POST → `queued`; poll → `ready`, `char_count=77`. Inserted a `processing`/`embedding` row, restarted the API; log showed `requeued 1 interrupted source(s)` and the source reached `ready` (`char_count=34`). Regenerated `web/src/lib/api-types.ts` from the expanded OpenAPI schema (242 lines added); `tsc --noEmit` clean.
 - **Next: P2.2 — text end-to-end** (recursive chunker 1000/150, OpenAI embeddings, PGVector `chunks` init + HNSW, metadata, `chunk_count`, search smoke script).
+
+### 2026-10-28 — P2.2 complete (text → chunk → embed → index)
+
+- **Chunker**: `ingestion/chunker.py` uses `RecursiveCharacterTextSplitter` at 1000 chars / 150 overlap with `add_start_index`; every `Chunk` carries `index`, `char_start`, and `char_end`, so a citation can point at the exact snapshot range.
+- **LangGraph**: `ingestion/graph.py` compiles `extract → chunk → embed_and_index` over `IngestState`. Each node commits its stage for the polling UI; exceptions bubble to the worker boundary, which marks the source `failed`, stores a safe message, and deletes partial vectors. The worker still owns the DB queue and `SKIP LOCKED` claim.
+- **Embeddings**: `services/vector_store.py` builds `OpenAIEmbeddings` (`text-embedding-3-small`, `EMBEDDING_DIMENSIONS=1536`, 3 retries) and fails with a clear `EmbeddingConfigError` when the key is still the `sk-...` placeholder. Startup logs that warning instead of crashing; the API stays healthy and a source fails with the same human-readable message.
+- **PGVector**: single `chunks` collection; tables created by `langchain-postgres`, then a cosine HNSW index (`ix_langchain_pg_embedding_hnsw`) is created idempotently at startup and before use. Metadata: `notebook_id`, `source_id`, `source_type`, `chunk_index`, `title`, `char_start`, `char_end`. Search always applies `filter={"notebook_id": ...}`.
+- **Delete invariant**: `services.sources.delete` now removes a source's vectors before the row. `langchain-postgres 0.0.19`'s `adelete(filter=...)` silently ignores filters, so deletion is direct SQL on `cmetadata->>'source_id'`; re-index is delete-then-add with deterministic `source_id:index` IDs.
+- **Tests** (9 new, 30 total): chunk size/overlap/offsets + empty rejection; notebook-filter isolation; re-index replaces rather than duplicates; HNSW index exists; delete removes vectors; worker pipeline writes searchable chunks. `ruff check`, `ruff format --check`, `mypy` (21 files), and `pytest -q` all green.
+- **Manual evidence**: with deterministic test embeddings, a 1608-char text source reached `ready` with `chunk_count=2`; filtered search returned both chunks (best distance 0.8835). Live API without a real key: `queued → failed` with “OPENAI_API_KEY is not configured…”. `langchain_pg_*` tables and the HNSW index exist; test vectors cleaned to zero.
+- **Pending**: the real smoke command (`uv run python -m app.evals.smoke_search --notebook <id> --query "…"`) needs a real `OPENAI_API_KEY`; run it after adding one. P2.7 still owns the re-index/retry UX.
+- **Next: P2.3 — PDF** (multipart upload cap + type check, `source_files` bytea, per-page extractor, streaming file endpoint, PDF viewer opening at a page).
 
 ## 12. Docs map
 

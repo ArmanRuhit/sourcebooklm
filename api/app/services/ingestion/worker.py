@@ -1,12 +1,12 @@
-"""Postgres-backed ingestion worker (P2.1 skeleton).
+"""Postgres-backed ingestion worker (P2.2).
 
 The `sources` table is the queue. A claim takes one row with
 FOR UPDATE SKIP LOCKED, flips it to `processing`, and commits; that releases
 the lock while keeping the row invisible to other workers. Startup requeues
 rows left in `processing` by a crash.
 
-P2.1 processes text only. The stub advances stages and marks the source ready;
-P2.2 replaces it with extract -> chunk -> embed+index.
+P2.2 runs the LangGraph pipeline for text sources: extract -> chunk ->
+embed and index. Later phases add extractors for the other source kinds.
 """
 
 import asyncio
@@ -14,20 +14,19 @@ import logging
 import uuid
 from typing import Any, cast
 
+from langchain_core.embeddings import Embeddings
 from sqlalchemy import CursorResult, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import async_session_factory
-from app.models import Source, SourceContent
+from app.models import Source
+from app.services import vector_store
+from app.services.ingestion import graph
 
 logger = logging.getLogger(__name__)
 
 POLL_INTERVAL_SECONDS = 1.0
 MAX_ERROR_LENGTH = 1000
-
-
-class IngestionError(Exception):
-    """A source-specific failure that is safe to show in `sources.error`."""
 
 
 async def requeue_stale(session: AsyncSession) -> int:
@@ -62,30 +61,25 @@ async def claim_next(session: AsyncSession) -> uuid.UUID | None:
     return source.id
 
 
-async def _advance(session: AsyncSession, source: Source, stage: str) -> None:
-    """Persist a stage transition so polling clients can see progress."""
-    source.stage = stage
-    await session.commit()
+async def _mark_failed(source_id: uuid.UUID, exc: Exception) -> None:
+    """Remove partial vectors, then record a user-safe failure message."""
+    try:
+        await vector_store.delete_source(str(source_id))
+    except Exception:  # cleanup is best-effort; never mask the real error
+        logger.warning("could not remove partial vectors for %s", source_id, exc_info=True)
+
+    async with async_session_factory() as session:
+        source = await session.get(Source, source_id)
+        if source is None:
+            return
+
+        source.status = "failed"
+        source.stage = None
+        source.error = (str(exc) or "Ingestion failed")[:MAX_ERROR_LENGTH]
+        await session.commit()
 
 
-async def _run_text_stub(session: AsyncSession, source: Source) -> None:
-    """Stand-in pipeline: validate the snapshot and walk the status machine."""
-    content = await session.get(SourceContent, source.id)
-    if content is None or not content.text:
-        raise IngestionError("No text content to ingest")
-
-    source.char_count = len(content.text)
-    await _advance(session, source, "chunking")
-    await _advance(session, source, "embedding")
-    await _advance(session, source, "indexing")
-
-    source.status = "ready"
-    source.stage = None
-    source.error = None
-    await session.commit()
-
-
-async def process_next() -> bool:
+async def process_next(embeddings: Embeddings | None = None) -> bool:
     """Claim and process one queued source; True when a row was handled."""
     async with async_session_factory() as session:
         source_id = await claim_next(session)
@@ -93,23 +87,16 @@ async def process_next() -> bool:
         return False
 
     async with async_session_factory() as session:
-        source = await session.get(Source, source_id)
-        if source is None:
+        if await session.get(Source, source_id) is None:
             return True
 
-        try:
-            await _run_text_stub(session, source)
-        except Exception as exc:  # worker boundary: never kill the loop
-            logger.exception("source %s failed", source_id)
-            await session.rollback()
-            failed = await session.get(Source, source_id)
-            if failed is not None:
-                failed.status = "failed"
-                failed.stage = None
-                failed.error = (str(exc) or "Ingestion failed")[:MAX_ERROR_LENGTH]
-                await session.commit()
-        else:
-            logger.info("source %s ready", source_id)
+    try:
+        await graph.run_ingestion(source_id, embeddings=embeddings)
+    except Exception as exc:  # worker boundary: never kill the loop
+        logger.exception("source %s failed", source_id)
+        await _mark_failed(source_id, exc)
+    else:
+        logger.info("source %s ready", source_id)
 
     return True
 

@@ -47,3 +47,9 @@
 1. **Fundamental** — `claim_next` selects a row `FOR UPDATE SKIP LOCKED`, flips it to `processing`, and commits before the pipeline runs. Why release the lock immediately instead of holding it for the whole job, and what makes the claim safe without that lock?
 2. **Tradeoff** — The `sources` table is the queue: no Redis, no Celery. What does that buy (one datastore, transactional status changes, simple deploy) and what does it cost at higher scale (polling, idle connections, no retry/priority features, worker count limits)?
 3. **Failure mode** — A worker dies after committing `status='processing'` but before finishing. Trace the recovery: what does `requeue_stale` change, why is that safe to run at every startup, and what would happen to the source if no startup requeue existed?
+
+## P2.2 — text pipeline (banked 2026-10-28)
+
+1. **Fundamental** — Chunks use 1000 chars with 150 chars of overlap and keep `char_start`/`char_end`. What does the overlap protect against at retrieval time, and what would citations lose if the offsets were dropped?
+2. **Tradeoff** — Re-indexing deletes a source's vectors and re-adds them with deterministic `source_id:index` IDs. What does that buy (idempotency, no stale chunks) and what does it cost compared with upserting only changed chunks (embedding spend, a brief window with no vectors)?
+3. **Failure mode** — `langchain-postgres 0.0.19`'s `adelete(filter={...})` accepts a filter and silently deletes nothing. What would you observe after deleting or re-indexing a source, and how do you make the operation trustworthy? (The fix here deletes by `cmetadata->>'source_id'` in SQL.)

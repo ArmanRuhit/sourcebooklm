@@ -165,7 +165,7 @@ data: {"detail":"…"}
 
 ### 5.2 LangGraph
 
-The pipeline is a `StateGraph` over `IngestState {source_id, notebook_id, kind, config}` with nodes `extract → chunk → embed_and_index`, plus a conditional `mark_failed` terminator on error. LangGraph is used **here** (deterministic multi-step job with per-node error handling and stage writes); the answer path stays plain explicit code until P4 (no agent loops needed to answer questions). This is intentional scope, not an omission.
+The pipeline is a `StateGraph` over `IngestState {source_id, notebook_id, kind, title, text, chunks}` with nodes `extract → chunk → embed_and_index`. Each node commits its stage; exceptions bubble to the worker boundary, which marks the source `failed`, records `sources.error`, and removes partial vectors. LangGraph is used **here** (deterministic multi-step job with per-node stage writes and clear failure ownership); the answer path stays plain explicit code until P4 (no agent loops needed to answer questions). This is intentional scope, not an omission.
 
 ### 5.3 Extractors
 

@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 
     # --- embedding ---
     embedding_model: str = "text-embedding-3-small"
+    embedding_dimensions: int = 1536
 
     # --- web + uploads ---
     web_origin: str = "http://localhost:3000"

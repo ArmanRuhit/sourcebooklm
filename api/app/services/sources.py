@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Source, SourceContent
 from app.schemas import SourceCreate
+from app.services import vector_store
 
 
 def _title_from_text(text: str) -> str:
@@ -48,6 +49,7 @@ async def get(session: AsyncSession, source_id: uuid.UUID) -> Source | None:
 
 
 async def delete(session: AsyncSession, source: Source) -> None:
-    """Delete a source; files/contents/vectors cascade from here."""
+    """Delete a source; vectors and files/contents cascade from here."""
+    await vector_store.delete_source(str(source.id))
     await session.delete(source)
     await session.commit()
