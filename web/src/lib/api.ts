@@ -73,6 +73,10 @@ export function listNotebooks(): Promise<Notebook[]> {
   return request<Notebook[]>("/api/v1/notebooks", { cache: "no-store" });
 }
 
+export function getNotebook(id: string): Promise<Notebook> {
+  return request<Notebook>(`/api/v1/notebooks/${id}`, { cache: "no-store" });
+}
+
 export function createNotebook(name: string): Promise<Notebook> {
   return request<Notebook>("/api/v1/notebooks", {
     method: "POST",

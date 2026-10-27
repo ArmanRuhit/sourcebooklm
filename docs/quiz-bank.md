@@ -35,3 +35,9 @@
 1. **Fundamental** — `request<T>` returns `undefined as T` for a 204 and otherwise casts `response.json()`. Where does the type system stop protecting you, and what would a `deleteNotebook` caller see if the API started returning `200 {"deleted": true}` instead of 204?
 2. **Tradeoff** — Create/rename dialogs are mounted only while open, so each open starts from fresh `useState`. What does that pattern buy over keeping them mounted + resetting fields in an effect, and what does it cost (think exit animation, in-progress form state, focus)?
 3. **Failure mode** — The first typed client had `` fetch(`{API_URL}${path}`) `` (missing `$`) and `Content-Type: application/json` on GETs. Trace what the browser actually requests and why the failure surfaces as a `Request failed` toast instead of CORS/network noise.
+
+## P1.4 — notebook workspace shell (banked 2026-10-28)
+
+1. **Fundamental** — A request to `/notebooks/not-a-real-id` returns 422, not 404, because FastAPI validates the `UUID` path param before the handler runs. Why does the page map both 404 and 422 to "missing", and what does that say about the only input this route accepts?
+2. **Tradeoff** — The page fetches in a client effect and renders its own missing state, instead of being a server component that calls `getNotebook()` and `notFound()`. What do you gain (loading/retry UX, no server-side API origin coupling, simple client cache behavior) and what do you lose (real 404 HTTP status, server-rendered notebook name, one extra round trip after hydration)?
+3. **Failure mode** — The fetch effect depends on `[id, reloadKey]`. If someone removes `id` from the dependency array, what happens when the user navigates from notebook A to notebook B through a client-side link, and why would the URL and the displayed name disagree?

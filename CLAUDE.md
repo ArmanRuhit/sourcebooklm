@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-28 · Status: **P1.3 complete — notebooks UI live (list/create/rename/delete, empty + loading + error states); P1.4 (notebook shell) up next**
+Last updated: 2026-10-28 · Status: **P1.4 complete — notebook workspace shell live (sources + chat placeholders, not-found + retry states); P2.1 (source API + worker skeleton) up next**
 
 ## 1. Mission & success criteria
 
@@ -224,7 +224,7 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 - [x] P1.1 Schema + migrations: all tables + pgvector extension
 - [x] P1.2 Notebooks CRUD API + tests
 - [x] P1.3 Notebooks UI (list, create, rename, delete, empty state) + generated API types
-- [ ] P1.4 Notebook page shell (sources panel + chat area placeholders)
+- [x] P1.4 Notebook page shell (sources panel + chat area placeholders)
 
 *Exit:* full notebook CRUD from the browser, persisted in Postgres, typed API client wired.
 
@@ -431,6 +431,14 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - **Verify evidence**: `bun run lint` clean · `bunx tsc --noEmit` clean · `bun run build` green (routes `/`, `/_not-found`, `/notebooks`) · browser pass: empty state → create → rename → delete → empty again, API confirmed `[]`; 3 seeded notebooks survive reload; no console errors.
 - Next 16.4.0 prints a security-advisory upgrade nudge on each fresh `next build` / `next dev`; deferred because the stack is pinned in §5 — revisit deliberately at P6.1.
 - **Next: P1.4 — Notebook page shell** (route `/notebooks/[id]`; sources panel + chat area placeholders; unknown id → not found; stacked on mobile).
+
+### 2026-10-28 — P1.4 complete (notebook workspace shell)
+
+- **Route**: `/notebooks/[id]` client page; each `NotebookCard` title links to it. Four states: `loading` skeleton → `missing` (API 404, or 422 for a malformed UUID) → `error` + retry → `ready`.
+- **Shell**: responsive `grid` — one column on mobile (sources stacked above chat), `320px 1fr` at `lg`; Sources panel with a disabled Add button and Phase 2 copy; Chat panel with a disabled composer. Real source/chat wiring lands in P2/P3.
+- **Next 16 Cache Components**: `useParams()` in a client component must sit under `<Suspense>`; split the page into `NotebookPage` (Suspense wrapper) + `NotebookPageContent`. Base UI's `Button render={<Link/>}` also needs `nativeButton={false}` so the anchor keeps link semantics and the console stays clean.
+- **Verify evidence**: `bun run lint` clean · `bunx tsc --noEmit` clean · `bun run build` green (`/notebooks/[id]` = Partial Prerender) · browser pass: card → shell, valid-but-unknown UUID → "Notebook not found", malformed id → same, back button → list; narrow viewport stacks panels; no JS exceptions (only the expected 404/422 resource logs).
+- **Next: P2.1 — Source API + worker skeleton** (status machine, `FOR UPDATE SKIP LOCKED` claim loop, startup requeue, stub text processor, tests).
 
 ## 12. Docs map
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { PencilIcon, Trash2Icon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,9 +21,12 @@ export function NotebookCard({
   return (
     <article className="group flex min-h-32 flex-col justify-between gap-6 rounded-xl border bg-card p-5 transition-colors hover:border-foreground/25">
       <div className="flex items-start justify-between gap-3">
-        <h2 className="min-w-0 truncate font-heading text-base font-medium tracking-tight">
+        <Link
+          href={`/notebooks/${notebook.id}`}
+          className="block min-w-0 truncate font-heading text-base font-medium tracking-tight hover:underline hover:underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
           {notebook.name}
-        </h2>
+        </Link>
         <div className="flex shrink-0 items-center gap-1">
           <Button
             variant="ghost"
