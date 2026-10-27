@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.routers import notebooks
 
 API_PREFIX = "/api/v1"
 
@@ -17,6 +18,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    app.include_router(notebooks.router, prefix=API_PREFIX)
 
     @app.get(f"{API_PREFIX}/health", summary="Liveness check")
     async def health() -> dict[str, str]:
