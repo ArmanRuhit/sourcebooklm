@@ -79,8 +79,10 @@ def split_pages(pages: Iterable[tuple[int, str]]) -> list[Chunk]:
 
 def split_transcript(
     cues: Iterable[tuple[str, float, float]],
+    *,
+    chunk_size: int = CHUNK_SIZE,
 ) -> list[Chunk]:
-    """Group timed cues into ~1000-char chunks without splitting a cue.
+    """Group timed cues into ~`chunk_size`-char chunks without splitting a cue.
 
     Each cue is ``(text, start_seconds, end_seconds)``. Chunks keep one cue of
     overlap, the first cue's start, and the last cue's end, so a citation can
@@ -120,7 +122,7 @@ def split_transcript(
 
     for cue in prepared:
         addition = len(cue[0]) + (1 if current else 0)
-        if current and size + addition > CHUNK_SIZE:
+        if current and size + addition > chunk_size:
             flush()
             current = [current[-1], cue]
             size = len(current[0][0]) + 1 + len(cue[0])

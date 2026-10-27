@@ -196,9 +196,10 @@ Extractor settings and failure texts are per-kind; all failures land in `sources
 ### 6.1 Retrieval
 
 1. Embed question (same model as ingestion).
-2. Similarity search with `filter={"notebook_id": …}`, k=12.
-3. MMR (λ≈0.5) → top 6. P4 may add query rewrite and/or rerank, each measured (§12).
-4. Assemble numbered context; cap ~12 000 chars of context, dropping lowest-ranked overflow.
+2. MMR search with `filter={"notebook_id": …}`, fetch 12, λ=0.5.
+3. Optional multi-query expansion + reciprocal-rank fusion (off by default; measured no gain on the 15-case fixture).
+4. LLM rerank the fused candidates and keep the best 6. This raised the fixture baseline from hit@1 0.93 / MRR 0.967 to 1.00 / 1.000.
+5. Assemble numbered context; cap ~12 000 chars of context, dropping lowest-ranked overflow. Rerank is best-effort: provider failures fall back to retrieval order.
 
 ### 6.2 Prompt (citation-constrained)
 

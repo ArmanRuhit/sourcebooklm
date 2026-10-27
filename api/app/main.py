@@ -5,8 +5,9 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.routers import notebooks, query, sources
@@ -54,6 +55,17 @@ def create_app() -> FastAPI:
     async def health() -> dict[str, str]:
         """Return ok when the API process is up."""
         return {"status": "ok"}
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
+        """Log unexpected failures with request context and never leak internals."""
+        logger.exception(
+            "Unhandled error on %s %s: %s",
+            request.method,
+            request.url.path,
+            exc,
+        )
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
     return app
 

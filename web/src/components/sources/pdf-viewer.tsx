@@ -20,8 +20,80 @@ export type PdfViewerProps = {
   snippet?: string | null;
 };
 
+function compactWithOffsets(text: string): { compact: string; offsets: number[] } {
+  let compact = "";
+  const offsets: number[] = [];
+
+  for (let index = 0; index < text.length; index += 1) {
+    if (!/\s/.test(text[index])) {
+      compact += text[index];
+      offsets.push(index);
+    }
+  }
+
+  return { compact, offsets };
+}
+
+function highlightCitation(root: HTMLElement | null, snippet: string | null) {
+  if (!root || !snippet) {
+    return;
+  }
+
+  const layer = root.querySelector<HTMLElement>(".react-pdf__Page__textContent");
+  const registry = (
+    CSS as unknown as {
+      highlights?: { set: (name: string, value: unknown) => void };
+    }
+  ).highlights;
+  const HighlightConstructor = (
+    window as unknown as { Highlight?: new (...ranges: Range[]) => unknown }
+  ).Highlight;
+
+  if (!layer || !registry || !HighlightConstructor) {
+    return;
+  }
+
+  const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
+  const nodes: { node: Text; start: number; end: number }[] = [];
+  let text = "";
+  let current = walker.nextNode();
+
+  while (current) {
+    const node = current as Text;
+    nodes.push({ node, start: text.length, end: text.length + node.data.length });
+    text += node.data;
+    current = walker.nextNode();
+  }
+
+  const page = compactWithOffsets(text);
+  const needle = compactWithOffsets(snippet).compact.slice(0, 40);
+  if (!needle) {
+    return;
+  }
+
+  const match = page.compact.indexOf(needle);
+  if (match < 0) {
+    return;
+  }
+
+  const rawStart = page.offsets[match];
+  const rawEnd = page.offsets[match + needle.length - 1] + 1;
+  const start = nodes.find((item) => rawStart >= item.start && rawStart < item.end);
+  const end = nodes.find((item) => rawEnd > item.start && rawEnd <= item.end);
+
+  if (!start || !end) {
+    return;
+  }
+
+  const range = document.createRange();
+  range.setStart(start.node, rawStart - start.start);
+  range.setEnd(end.node, rawEnd - end.start);
+  registry.set("sourcebooklm-citation", new HighlightConstructor(range));
+}
+
 export function PdfViewer({ url, initialPage = 1, snippet = null }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [numPages, setNumPages] = useState<number | null>(null);
   const [page, setPage] = useState(initialPage);
@@ -45,8 +117,34 @@ export function PdfViewer({ url, initialPage = 1, snippet = null }: PdfViewerPro
 
   const pageWidth = containerWidth > 0 ? Math.min(containerWidth - 32, 680) : 0;
 
+  useEffect(() => {
+    if (!snippet) {
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+
+    function apply() {
+      if (cancelled) {
+        return;
+      }
+      highlightCitation(pageRef.current, snippet);
+      attempts += 1;
+      if (attempts < 20) {
+        requestAnimationFrame(apply);
+      }
+    }
+
+    apply();
+    return () => {
+      cancelled = true;
+    };
+  }, [page, snippet, numPages]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <style>{`::highlight(sourcebooklm-citation) { background-color: #fde68a; color: #422006; }`}</style>
       <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
         <span className="text-xs text-muted-foreground">PDF preview</span>
         <div className="flex items-center gap-1">
@@ -103,11 +201,16 @@ export function PdfViewer({ url, initialPage = 1, snippet = null }: PdfViewerPro
           className="flex flex-col items-center gap-3"
         >
           {pageWidth > 0 && (
-            <Page
-              pageNumber={page}
-              width={pageWidth}
-              className="overflow-hidden rounded-sm shadow-sm ring-1 ring-foreground/10"
-            />
+            <div ref={pageRef}>
+              <Page
+                pageNumber={page}
+                width={pageWidth}
+                onRenderTextLayerSuccess={() =>
+                  highlightCitation(pageRef.current, snippet)
+                }
+                className="overflow-hidden rounded-sm shadow-sm ring-1 ring-foreground/10"
+              />
+            </div>
           )}
         </Document>
       </div>

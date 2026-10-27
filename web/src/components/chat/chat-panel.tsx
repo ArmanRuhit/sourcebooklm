@@ -169,7 +169,11 @@ export function ChatPanel({
           </p>
         </div>
       ) : (
-        <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
+        <div
+          className="flex-1 space-y-5 overflow-y-auto px-4 py-4"
+          role="log"
+          aria-live="polite"
+        >
           {messages.map((message) =>
             message.role === "user" ? (
               <div

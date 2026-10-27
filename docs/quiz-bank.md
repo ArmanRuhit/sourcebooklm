@@ -89,3 +89,15 @@
 1. **Fundamental** — Why does the SSE stream send `meta` and `citations` before any `token`, and why persist the user message before calling the LLM? What client and server behaviors does that ordering make possible when the connection drops mid-answer?
 2. **Tradeoff** — Retrieval fetches 12 candidates but MMR returns only 6 to the prompt. Why not pass the top 6 by similarity? What does diversity buy for multi-part questions, and what does it cost in prompt size and relevance?
 3. **Failure mode** — The model writes `[1]`, but citation metadata is produced by the app. Why must the app resolve `n` against the pre-built citation array instead of trusting any source ID the model might emit, and what would break if that array were reordered after generation?
+
+## P4 — retrieval quality (banked 2026-10-28)
+
+1. **Fundamental** — The eval harness measures hit@1/3/6 and MRR over 15 pairs. Why record all four instead of one accuracy number, and what does MRR capture that hit@3 hides?
+2. **Tradeoff** — Reranking adds one LLM call before generation but raised fixture hit@1 from 0.93 to 1.00. When is that latency/cost worth it, and how should the app behave if the reranker times out?
+3. **Failure mode** — PDF highlighting searches the rendered text layer for a compacted 40-character prefix of the snippet. What happens when extraction changes spacing or hyphenation, and why is falling back to the snippet banner safer than wrapping arbitrary DOM spans?
+
+## P5 — UX & hardening (banked 2026-10-28)
+
+1. **Fundamental** — Duplicate detection compares URL, or filename plus byte size, client-side. Why is this a warning rather than a hard block, and why can the client not be the final authority?
+2. **Tradeoff** — On mobile the sources panel moves into a drawer instead of staying stacked above chat. What does the drawer buy in screen real estate, and what does it cost in discoverability and extra open/close state?
+3. **Failure mode** — The FastAPI catch-all handler logs the exception and returns a generic detail string. Why not return `str(exc)` to the client, and what would an attacker learn from stack traces or SQL errors?

@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-28 · Status: **Phase 3 complete — grounded streaming chat with citations, history hydration, and per-source deep links; P4.1 (retrieval evals) up next**
+Last updated: 2026-10-28 · Status: **Phases 4–5 complete — measured retrieval (rerank hit@1 1.00), highlight fidelity across four source types, mobile source drawer, toasts, and hardening; Phase 6 (deploy + README) up next**
 
 ## 1. Mission & success criteria
 
@@ -252,17 +252,17 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 
 ### Phase 4 — Retrieval quality (P4) — *rubric items 3, 10*
 
-- [ ] P4.1 Retrieval eval harness + handcrafted Q/A fixture set (baseline numbers recorded)
-- [ ] P4.2 Upgrades: transcript-aware chunking, MMR, query rewrite and/or rerank — measured
-- [ ] P4.3 Highlight fidelity: PDF page + snippet, transcript cue highlight, text offset highlight
+- [x] P4.1 Retrieval eval harness + handcrafted Q/A fixture set (baseline numbers recorded)
+- [x] P4.2 Upgrades: transcript-aware chunking, MMR, query rewrite and/or rerank — measured
+- [x] P4.3 Highlight fidelity: PDF page + snippet, transcript cue highlight, text offset highlight
 
 *Exit:* eval improvement documented; citations land with visible highlighting in at least 3 source types.
 
 ### Phase 5 — UX & hardening (P5) — *rubric item 7*
 
-- [ ] P5.1 UX states pass: skeletons, empty states, disabled states, toasts, responsive
-- [ ] P5.2 Error/edge hardening: upload validation, duplicates, API error handling
-- [ ] P5.3 ⭐ Accessibility quick pass (keyboard nav, focus, labels)
+- [x] P5.1 UX states pass: skeletons, empty states, disabled states, toasts, responsive
+- [x] P5.2 Error/edge hardening: upload validation, duplicates, API error handling
+- [x] P5.3 ⭐ Accessibility quick pass (keyboard nav, focus, labels)
 
 *Exit:* every user-visible flow has loading/empty/error handling; passes a self-run UX checklist.
 
@@ -524,6 +524,17 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - **Tests** (7 new, 98 total): retriever relevance, notebook isolation, blank query; SSE event order/shape, empty-notebook refusal, mocked token stream + persisted citation, validation and missing-notebook errors. `ruff check`, `ruff format --check`, `mypy` (29 files), and `pytest -q` are green.
 - **Live evidence**: a real text source produced a streamed `gpt-5-mini` answer citing `[1]`; `GET /messages` showed both persisted messages. Reloading the notebook hydrated “2 messages”; a new question streamed to “4 messages”; clicking `[1]` opened the text viewer with the snippet and a `<mark>` over the cited chunk. A fresh empty notebook returned the refusal token, persisted it with `citations=[]`, then deleted cleanly. Smoke source/conversation removed afterward.
 - **Next: P4.1 — retrieval eval harness** (seed fixture notebook, 12–15 Q→expected-source pairs, record hit@k baseline).
+
+### 2026-10-28 — Phase 4 + 5 complete (measured retrieval, highlight fidelity, UX hardening)
+
+- **Eval harness**: `app/evals/retrieval.py` seeds a throwaway notebook with six fixtures (text, PDF, URL, YouTube, VTT, distractor), runs **15** handcrafted question→source pairs, and prints hit@1/3/6 plus MRR. Flags cover real/fake embeddings, an MMR λ sweep, query expansion, reranking, transcript chunk size, and `--keep`; the notebook and vectors are removed by default.
+- **Baseline numbers** (real `text-embedding-3-small`): hit@1 **0.93**, hit@3 **1.00**, hit@6 **1.00**, MRR **0.967**. Fake embeddings: 0.40 / 0.87 / 1.00 / 0.644 — documented as the offline reproducibility floor. λ 0.3/0.5/0.7 tied, and 800- vs 1000-char transcript chunks tied, so both defaults stayed.
+- **Measured upgrade**: `services/rag/rerank.py` asks the chat model to order the fused candidates before the top 6 are kept. With rerank the fixture reaches hit@1 **1.00**, hit@3 **1.00**, hit@6 **1.00**, MRR **1.000**. `services/rag/expansion.py` (multi-query + RRF) is implemented and exposed, but measured no gain, so it stays off. Both upgrades are best-effort and fall back to retrieval order. Chat now calls `retrieve(..., use_rerank=True)`.
+- **Highlight fidelity**: PDF citations open the cited page, show the snippet banner, and use the CSS Custom Highlight API over the rendered text layer (fallback: snippet only). Text/URL use `<mark>` over `char_start`–`char_end`; VTT highlights the overlapping cue and scrolls to it; YouTube seeks and highlights the active cue. Live PDF test: page 2 opened, answer cited `[1]`/`[2]`, and `CSS.highlights` contained one range.
+- **UX pass**: mobile sources drawer (`SourceDrawer`) replaces the stacked panel under `lg`; Sonner toasts announce add/re-index/delete/duplicate; skip link targets `#main`; chat transcript is an `aria-live` log; existing skeletons, empty states, and disabled-in-flight controls audited.
+- **Hardening**: duplicate PDF/VTT/URL/YouTube additions show a warning toast while still allowing the add; global FastAPI exception handler logs method/path and returns `{"detail":"Internal server error"}`; upload size/type, long questions, and validation errors already have both-end guards. Desktop (1401 px) and narrow (~556 px) layouts checked in-browser; no console errors.
+- **Checks**: **103 tests passed**, ruff format/check clean, mypy 32 files; `tsc --noEmit`, ESLint, and production build green. The recurring Next security stop was retried, not acted on.
+- **Next: Phase 6 — deploy + README** (P6.1 Neon + Render, P6.2 README/demo assets).
 
 ## 12. Docs map
 

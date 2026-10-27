@@ -5,16 +5,20 @@ import { useParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   ArrowLeftIcon,
+  ListIcon,
+  PlusIcon,
   RefreshCwIcon,
   SearchXIcon,
   XIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { AppHeader } from "@/components/app-header";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { AddSourceDialog } from "@/components/sources/add-source-dialog";
 import { DeleteSourceDialog } from "@/components/sources/delete-source-dialog";
 import { PdfViewerPanel } from "@/components/sources/pdf-viewer-panel";
+import { SourceDrawer } from "@/components/sources/source-drawer";
 import { SourceList } from "@/components/sources/source-list";
 import { TextSourceViewer } from "@/components/sources/text-source-viewer";
 import { VttSourceViewer } from "@/components/sources/vtt-source-viewer";
@@ -187,6 +191,7 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
     removeSource,
   } = useSources(notebook.id);
   const [addOpen, setAddOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const [deletingSource, setDeletingSource] = useState<Source | null>(null);
   const [busySourceId, setBusySourceId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -202,22 +207,40 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
 
   async function handleUpload(file: File) {
     const source = await uploadPdf(notebook.id, file);
-    addSource(source);
+    addWithFeedback(source);
   }
 
   async function handleUploadVtt(file: File) {
     const source = await uploadVtt(notebook.id, file);
-    addSource(source);
+    addWithFeedback(source);
   }
 
   async function handleAddUrl(url: string) {
     const source = await createUrlSource(notebook.id, url);
-    addSource(source);
+    addWithFeedback(source);
   }
 
   async function handleAddYoutube(url: string) {
     const source = await createYoutubeSource(notebook.id, url);
+    addWithFeedback(source);
+  }
+
+  function addWithFeedback(source: Source) {
+    const duplicate = sources?.find(
+      (item) =>
+        item.id !== source.id &&
+        item.kind === source.kind &&
+        (item.config.url === source.config.url ||
+          (item.config.filename === source.config.filename &&
+            item.config.size_bytes === source.config.size_bytes)),
+    );
     addSource(source);
+
+    if (duplicate) {
+      toast.warning("That source is already in this notebook.");
+    } else {
+      toast.success("Source added. Indexing started.");
+    }
   }
 
   async function handleReindex(source: Source) {
@@ -227,8 +250,11 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
     try {
       const updated = await reindexSource(source.id);
       updateSource(updated);
+      toast.success("Re-indexing started.");
     } catch (caught) {
-      setActionError(getErrorMessage(caught));
+      const message = getErrorMessage(caught);
+      setActionError(message);
+      toast.error(message);
     } finally {
       setBusySourceId(null);
     }
@@ -238,13 +264,16 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
     removeSource(id);
     setViewer((current) => (current?.source.id === id ? null : current));
     setActionError(null);
+    toast.success("Source deleted.");
   }
 
   function handleCitation(citation: Citation) {
     const source = sources?.find((item) => item.id === citation.source_id);
 
     if (!source) {
-      setActionError("That cited source is no longer available.");
+      const message = "That cited source is no longer available.";
+      setActionError(message);
+      toast.error(message);
       return;
     }
 
@@ -260,7 +289,10 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
     <div className="flex min-h-screen flex-col">
       <AppHeader />
 
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 sm:px-6">
+      <main
+        id="main"
+        className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 sm:px-6"
+      >
         <div className="mb-6 flex flex-col gap-1">
           <Link
             href="/notebooks"
@@ -277,6 +309,24 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
           </p>
         </div>
 
+        <div className="mb-3 flex gap-2 lg:hidden">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSourcesOpen(true)}
+          >
+            <ListIcon />
+            Sources
+            {sources && (
+              <span className="text-muted-foreground">({sources.length})</span>
+            )}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+            <PlusIcon />
+            Add
+          </Button>
+        </div>
+
         <div
           className={`grid flex-1 gap-4 lg:grid-cols-[320px_1fr] ${
             viewer
@@ -284,25 +334,27 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
               : ""
           }`}
         >
-          <SourceList
-            sources={sources}
-            error={sourcesError}
-            actionError={actionError}
-            busySourceId={busySourceId}
-            activeSourceId={viewer?.source.id}
-            onAdd={() => setAddOpen(true)}
-            onRetry={reload}
-            onOpen={(source) =>
-              setViewer({
-                source,
-                page: 1,
-                startSeconds: 0,
-                citation: null,
-              })
-            }
-            onReindex={handleReindex}
-            onDelete={setDeletingSource}
-          />
+          <div className="hidden lg:block">
+            <SourceList
+              sources={sources}
+              error={sourcesError}
+              actionError={actionError}
+              busySourceId={busySourceId}
+              activeSourceId={viewer?.source.id}
+              onAdd={() => setAddOpen(true)}
+              onRetry={reload}
+              onOpen={(source) =>
+                setViewer({
+                  source,
+                  page: 1,
+                  startSeconds: 0,
+                  citation: null,
+                })
+              }
+              onReindex={handleReindex}
+              onDelete={setDeletingSource}
+            />
+          </div>
 
           <ChatPanel
             notebookId={notebook.id}
@@ -380,6 +432,37 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
           }}
           onDeleted={handleDeleted}
         />
+      )}
+
+      {sourcesOpen && (
+        <SourceDrawer open={sourcesOpen} onOpenChange={setSourcesOpen}>
+          <SourceList
+            sources={sources}
+            error={sourcesError}
+            actionError={actionError}
+            busySourceId={busySourceId}
+            activeSourceId={viewer?.source.id}
+            onAdd={() => {
+              setSourcesOpen(false);
+              setAddOpen(true);
+            }}
+            onRetry={reload}
+            onOpen={(source) => {
+              setViewer({
+                source,
+                page: 1,
+                startSeconds: 0,
+                citation: null,
+              });
+              setSourcesOpen(false);
+            }}
+            onReindex={handleReindex}
+            onDelete={(source) => {
+              setSourcesOpen(false);
+              setDeletingSource(source);
+            }}
+          />
+        </SourceDrawer>
       )}
     </div>
   );

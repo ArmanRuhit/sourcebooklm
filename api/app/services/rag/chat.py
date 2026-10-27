@@ -182,7 +182,7 @@ async def query_events(notebook_id: str, question: str) -> AsyncIterator[dict[st
         answer = ""
 
         try:
-            documents = await retriever.retrieve(notebook_id, question)
+            documents = await retriever.retrieve(notebook_id, question, use_rerank=True)
             citations = [
                 citation_from_document(index, document)
                 for index, document in enumerate(documents, start=1)
