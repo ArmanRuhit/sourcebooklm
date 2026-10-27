@@ -219,6 +219,22 @@ async def get_source(source_id: uuid.UUID, session: SessionDep) -> Source:
     return await _get_source_or_404(session, source_id)
 
 
+@sources_router.post(
+    "/{source_id}/reindex",
+    response_model=SourceRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def reindex_source(source_id: uuid.UUID, session: SessionDep) -> Source:
+    """Drop indexed vectors and queue the source for another ingestion pass."""
+    source = await _get_source_or_404(session, source_id)
+    if source.status == "processing":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Source is already being processed",
+        )
+    return await sources.reindex(session, source)
+
+
 @sources_router.get("/{source_id}/content", response_model=SourceContentRead)
 async def get_source_content(source_id: uuid.UUID, session: SessionDep) -> SourceContent:
     """Return the stored text snapshot for the source viewer."""

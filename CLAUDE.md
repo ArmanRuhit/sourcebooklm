@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-28 · Status: **P2.6 complete — uploaded VTT files parse into timestamped cues and reuse the transcript chunk/index path, with a transcript viewer and original-file link; P2.7 (remove / re-index / failure UX) up next**
+Last updated: 2026-10-28 · Status: **P2.7 complete — sources can be re-indexed, deleted (rows + vectors), and failed jobs retried, with 2s status polling; Phase 2 is closed and P3.1 (retriever) is up next**
 
 ## 1. Mission & success criteria
 
@@ -236,7 +236,7 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 - [x] P2.4 Website URL extraction
 - [x] P2.5 YouTube transcript extraction (timestamped segments)
 - [x] P2.6 VTT transcript parsing
-- [ ] P2.7 Remove / re-index / failure states + status polling UI
+- [x] P2.7 Remove / re-index / failure states + status polling UI
 
 *Exit:* all five source types ingest to `ready` with correct metadata; delete removes vectors; failures visible + retryable.
 
@@ -503,6 +503,16 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - **Tests** (9 new, 86 total): parser cues/settings/markup/BOM/CRLF, malformed headers/timestamps/backwards cues/empty files, upload + streaming, `.txt`/wrong-magic/empty/missing/oversize rejection, a full VTT pipeline with segment + vector metadata, and a malformed file landing in `failed`. `ruff check`, `ruff format --check`, `mypy` (24 files), and `pytest -q` are green.
 - **Manual evidence**: live upload of a two-cue VTT reached `ready` in ~1 s with `chunk_count=1`, `char_count=101`, and segments `1.0–4.5` / `5.0–9.25`. The browser rendered “2 transcript cues”, both timestamps, and the original-file link; adding a second VTT through the dialog reached Ready via polling without a refresh, and its viewer showed “1 transcript cue”. Both smoke sources were deleted; the list returned to `[]`.
 - **Next: P2.7 — remove / re-index / failure UX** (delete action, retry, error states, polling polish).
+
+### 2026-10-28 — P2.7 complete (delete, re-index, retry)
+
+- **API**: `POST /api/v1/sources/{id}/reindex` (202) deletes the source's vectors, resets `status=queued`, `stage/error=null`, `chunk_count=0`, and lets the worker rebuild. It returns 409 while a source is `processing` so one source cannot be double-claimed. `DELETE` keeps its 204 and now has lifecycle test coverage proving vectors are gone.
+- **Re-index is idempotent**: the endpoint deletes vectors before queueing, and the index graph deletes again before adding, so repeated calls leave exactly one vector per chunk. Tests call reindex twice and assert one unique `chunk_index`.
+- **Failure recovery**: a failed URL source retries through the same endpoint and reaches `ready` once the extractor is fixed. The UI shows the failure message plus Retry; re-index and delete are available on every source.
+- **Web**: source rows gained an action bar (Ready → Re-index, Failed → Retry, always Delete) with per-row busy spinners; confirm dialog names the source and explains that text and indexed chunks are removed. Deleting the open source closes the viewer. `useSources` now exposes `updateSource`/`removeSource` and restarts polling after mutations, so re-index is visible without a refresh.
+- **Tests** (5 new, 91 total): re-index twice with unique vectors; API delete removes vectors and GET 404s; 409 while processing; failed → retry → ready; missing source 404. `ruff check`, `ruff format --check`, `mypy` (24 files), and `pytest -q` are green.
+- **Manual evidence**: a ready text source re-indexed through the UI (`Queued` → `Ready`), then delete confirmed removal (API list `[]`, vector count 0). A bad URL produced `failed` with “Could not resolve that URL's host”; Retry returned it to `Queued` and back to `failed` with the same message, with no console errors. Smoke source deleted afterward.
+- **Next: P3.1 — retriever module** (notebook-filtered similarity search k=12 → MMR → 6, tests).
 
 ## 12. Docs map
 

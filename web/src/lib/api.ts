@@ -164,3 +164,13 @@ export function getSourceContent(sourceId: string): Promise<SourceContent> {
 export function getSourceFileUrl(sourceId: string): string {
   return `${API_URL}/api/v1/sources/${sourceId}/file`;
 }
+
+export async function deleteSource(sourceId: string): Promise<void> {
+  await request<void>(`/api/v1/sources/${sourceId}`, { method: "DELETE" });
+}
+
+export function reindexSource(sourceId: string): Promise<Source> {
+  return request<Source>(`/api/v1/sources/${sourceId}/reindex`, {
+    method: "POST",
+  });
+}

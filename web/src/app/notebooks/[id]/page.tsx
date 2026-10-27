@@ -14,6 +14,7 @@ import {
 
 import { AppHeader } from "@/components/app-header";
 import { AddSourceDialog } from "@/components/sources/add-source-dialog";
+import { DeleteSourceDialog } from "@/components/sources/delete-source-dialog";
 import { PdfViewerPanel } from "@/components/sources/pdf-viewer-panel";
 import { SourceList } from "@/components/sources/source-list";
 import { TextSourceViewer } from "@/components/sources/text-source-viewer";
@@ -28,6 +29,7 @@ import {
   getErrorMessage,
   getNotebook,
   getSourceFileUrl,
+  reindexSource,
   uploadPdf,
   uploadVtt,
   type Notebook,
@@ -176,10 +178,18 @@ function NotebookPageContent() {
 }
 
 function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
-  const { sources, error: sourcesError, reload, addSource } = useSources(
-    notebook.id,
-  );
+  const {
+    sources,
+    error: sourcesError,
+    reload,
+    addSource,
+    updateSource,
+    removeSource,
+  } = useSources(notebook.id);
   const [addOpen, setAddOpen] = useState(false);
+  const [deletingSource, setDeletingSource] = useState<Source | null>(null);
+  const [busySourceId, setBusySourceId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{
     source: Source;
     page: number;
@@ -204,6 +214,26 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
   async function handleAddYoutube(url: string) {
     const source = await createYoutubeSource(notebook.id, url);
     addSource(source);
+  }
+
+  async function handleReindex(source: Source) {
+    setBusySourceId(source.id);
+    setActionError(null);
+
+    try {
+      const updated = await reindexSource(source.id);
+      updateSource(updated);
+    } catch (caught) {
+      setActionError(getErrorMessage(caught));
+    } finally {
+      setBusySourceId(null);
+    }
+  }
+
+  function handleDeleted(id: string) {
+    removeSource(id);
+    setViewer((current) => (current?.source.id === id ? null : current));
+    setActionError(null);
   }
 
   return (
@@ -237,12 +267,16 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
           <SourceList
             sources={sources}
             error={sourcesError}
+            actionError={actionError}
+            busySourceId={busySourceId}
             activeSourceId={viewer?.source.id}
             onAdd={() => setAddOpen(true)}
             onRetry={reload}
             onOpen={(source) =>
               setViewer({ source, page: 1, startSeconds: 0 })
             }
+            onReindex={handleReindex}
+            onDelete={setDeletingSource}
           />
 
           <section className="flex min-h-96 flex-col rounded-xl border bg-card">
@@ -326,6 +360,18 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
           onUploadVtt={handleUploadVtt}
           onAddUrl={handleAddUrl}
           onAddYoutube={handleAddYoutube}
+        />
+      )}
+
+      {deletingSource && (
+        <DeleteSourceDialog
+          source={deletingSource}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeletingSource(null);
+            }
+          }}
+          onDeleted={handleDeleted}
         />
       )}
     </div>

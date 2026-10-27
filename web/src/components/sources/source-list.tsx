@@ -5,8 +5,11 @@ import {
   FileStackIcon,
   FileTextIcon,
   Link2Icon,
+  Loader2Icon,
   PlusIcon,
   RefreshCwIcon,
+  RotateCcwIcon,
+  Trash2Icon,
   VideoIcon,
 } from "lucide-react";
 
@@ -18,10 +21,14 @@ import { formatFileSize } from "@/lib/format";
 type SourceListProps = {
   sources: Source[] | null;
   error: string | null;
+  actionError?: string | null;
+  busySourceId?: string | null;
   activeSourceId?: string;
   onAdd: () => void;
   onRetry: () => void;
   onOpen: (source: Source) => void;
+  onReindex: (source: Source) => void;
+  onDelete: (source: Source) => void;
 };
 
 function sourceMeta(source: Source): string {
@@ -68,10 +75,14 @@ function sourceMeta(source: Source): string {
 export function SourceList({
   sources,
   error,
+  actionError,
+  busySourceId,
   activeSourceId,
   onAdd,
   onRetry,
   onOpen,
+  onReindex,
+  onDelete,
 }: SourceListProps) {
   return (
     <aside className="flex min-h-72 flex-col rounded-xl border bg-card">
@@ -98,6 +109,15 @@ export function SourceList({
             Retry
           </Button>
         </div>
+      )}
+
+      {actionError && (
+        <p
+          role="alert"
+          className="border-b bg-destructive/5 px-4 py-2 text-xs text-destructive"
+        >
+          {actionError}
+        </p>
       )}
 
       {sources === null ? (
@@ -128,9 +148,14 @@ export function SourceList({
           {sources.map((source) => {
             const canOpen = source.status === "ready";
             const active = activeSourceId === source.id;
+            const busy = busySourceId === source.id;
 
             return (
-              <li key={source.id}>
+              <li
+                key={source.id}
+                data-active={active}
+                className="rounded-lg transition-colors data-[active=true]:bg-muted"
+              >
                 <button
                   type="button"
                   onClick={() => {
@@ -140,8 +165,7 @@ export function SourceList({
                   }}
                   aria-disabled={!canOpen}
                   aria-current={active ? "true" : undefined}
-                  className="flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-disabled:cursor-default aria-disabled:hover:bg-transparent data-[active=true]:bg-muted"
-                  data-active={active}
+                  className="flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-disabled:cursor-default aria-disabled:hover:bg-transparent"
                 >
                   <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border bg-background">
                     {source.kind === "url" ? (
@@ -171,6 +195,49 @@ export function SourceList({
                     )}
                   </div>
                 </button>
+
+                <div className="flex justify-end gap-0.5 px-2 pb-1">
+                  {source.status === "failed" && (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => onReindex(source)}
+                      disabled={busy}
+                    >
+                      {busy ? (
+                        <Loader2Icon className="animate-spin" />
+                      ) : (
+                        <RotateCcwIcon />
+                      )}
+                      Retry
+                    </Button>
+                  )}
+                  {source.status === "ready" && (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => onReindex(source)}
+                      disabled={busy}
+                    >
+                      {busy ? (
+                        <Loader2Icon className="animate-spin" />
+                      ) : (
+                        <RefreshCwIcon />
+                      )}
+                      Re-index
+                    </Button>
+                  )}
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => onDelete(source)}
+                    disabled={busy}
+                  >
+                    <Trash2Icon />
+                    Delete
+                  </Button>
+                </div>
               </li>
             );
           })}

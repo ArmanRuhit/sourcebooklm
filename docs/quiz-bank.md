@@ -77,3 +77,9 @@
 1. **Fundamental** — Why parse WebVTT into `(text, start, end)` cues instead of flattening the file to plain text and reusing the text chunker? Which later features become impossible if the timestamps are dropped?
 2. **Tradeoff** — The app stores both the original `.vtt` bytes in `source_files` and the derived `segments`/chunks. What does keeping the original buy for the viewer and re-indexing, and what does it cost in storage and write complexity?
 3. **Failure mode** — A file starts with `WEBVTT` but contains `00:00:02.000 --> 00:00:01.000`. The parser rejects it. Why not silently swap the endpoints, and where does the user see the consequence?
+
+## P2.7 — delete, re-index, retry (banked 2026-10-28)
+
+1. **Fundamental** — Re-index deletes the source's vectors before setting it `queued`, and the indexing step deletes again before adding. What invariant does that establish, and why is the second delete necessary for repeated or concurrent runs?
+2. **Tradeoff** — Delete is a hard delete: rows cascade and vectors are removed immediately, with no soft-delete or undo. What does that simplify (queries never filter tombstones, storage is reclaimed) and what does it cost (accidental loss, no audit trail)?
+3. **Failure mode** — The re-index endpoint returns 409 while a source is `processing` instead of queueing another run. What could happen if it accepted the request, and how does the `FOR UPDATE SKIP LOCKED` claim interact with that guard?

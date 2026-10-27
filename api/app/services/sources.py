@@ -176,3 +176,19 @@ async def delete(session: AsyncSession, source: Source) -> None:
     await vector_store.delete_source(str(source.id))
     await session.delete(source)
     await session.commit()
+
+
+async def reindex(session: AsyncSession, source: Source) -> Source:
+    """Drop a source's vectors and put it back on the ingestion queue.
+
+    The worker's index step deletes and re-adds vectors, so calling this twice
+    (or after a crash) still leaves exactly one vector set.
+    """
+    await vector_store.delete_source(str(source.id))
+    source.status = "queued"
+    source.stage = None
+    source.error = None
+    source.chunk_count = 0
+    await session.commit()
+    await session.refresh(source)
+    return source

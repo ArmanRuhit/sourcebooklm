@@ -9,6 +9,8 @@ type UseSourcesResult = {
   error: string | null;
   reload: () => void;
   addSource: (source: Source) => void;
+  updateSource: (source: Source) => void;
+  removeSource: (sourceId: string) => void;
 };
 
 /**
@@ -66,5 +68,20 @@ export function useSources(notebookId: string): UseSourcesResult {
     setReloadKey((key) => key + 1);
   }, []);
 
-  return { sources, error, reload, addSource };
+  const updateSource = useCallback((source: Source) => {
+    setSources((current) =>
+      current
+        ? current.map((item) => (item.id === source.id ? source : item))
+        : current,
+    );
+    setReloadKey((key) => key + 1);
+  }, []);
+
+  const removeSource = useCallback((sourceId: string) => {
+    setSources((current) =>
+      current ? current.filter((source) => source.id !== sourceId) : current,
+    );
+  }, []);
+
+  return { sources, error, reload, addSource, updateSource, removeSource };
 }
