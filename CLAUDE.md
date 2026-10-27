@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-26 · Status: **P1.2 in progress (checkpoint) — notebook schemas + service layer typed; router, endpoints, tests next**
+Last updated: 2026-10-28 · Status: **P1.2 complete — notebook CRUD API live (5 endpoints, 9 tests green); P1.3 (Notebooks UI) up next**
 
 ## 1. Mission & success criteria
 
@@ -222,7 +222,7 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 ### Phase 1 — Notebooks & data core (P1)
 
 - [x] P1.1 Schema + migrations: all tables + pgvector extension
-- [ ] P1.2 Notebooks CRUD API + tests
+- [x] P1.2 Notebooks CRUD API + tests
 - [ ] P1.3 Notebooks UI (list, create, rename, delete, empty state) + generated API types
 - [ ] P1.4 Notebook page shell (sources panel + chat area placeholders)
 
@@ -413,6 +413,15 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - **Review catch**: `session.add(Notebook)` (the class) instead of `session.add(notebook)` (the instance) — a live runtime bug the formatter/linter can't see; fixed during wrap-up. Also removed the duplicate `schema.py` (kept `schemas.py`) and its stray f-string.
 - **Verify (after cleanup)**: ruff check + format green, mypy green, `pytest -q` → 2 passed (notebook endpoint tests arrive with the router).
 - **Next: P1.2 files 3–5** — `routers/notebooks.py` (5 endpoints, 201/204, `{detail}` 404s), `main.py` `include_router` diff, `tests/test_notebooks.py` (7 tests: happy path, 404s, 422 validation, 100-char boundary, cascade) → full verify + slice close.
+
+### 2026-10-28 — P1.2 complete (notebooks CRUD API)
+
+- **Layers**: `schemas.py` (contracts: strip + 1–100 via `StringConstraints`), `services/notebooks.py` (create/list/get/rename/delete, no HTTP imports — reusable by the Phase-2 worker), `routers/notebooks.py` (5 endpoints under `/api/v1/notebooks`; `SessionDep`, `_get_or_404`, 200/201/204).
+- **Wiring**: `main.py` mounts the router with `prefix=API_PREFIX`; CORS stays settings-driven.
+- **Tests** (`tests/test_notebooks.py`, 7): CRUD happy path incl. whitespace strip; 404 set for GET/PATCH/DELETE; 422 for invalid names (`""`, blank, 101 chars); 100-char boundary creates; cascade proof — insert a `Source` directly, delete the notebook via API, the source is gone.
+- **Verify evidence**: `pytest -q` → 9 passed; `mypy` → 10 source files; `ruff check` green (one indent nit in the new test file reformatted); live curl smoke on port 8000: POST 201 (name stripped) → GET list/one 200 → PATCH 200 → DELETE 204 → GET 404.
+- Review catches: duplicate `schema.py` twin removed; f-string "docstrings" converted (`{id}` would import-error); `session.add(Notebook)` class-vs-instance bug fixed at checkpoint.
+- **Next: P1.3 — Notebooks UI** (list/create/rename/delete pages + generated TS client via `openapi-typescript`).
 
 ## 12. Docs map
 

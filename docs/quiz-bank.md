@@ -23,3 +23,9 @@
 1. **Fundamental** — Alembic's `env.py` sets `target_metadata = Base.metadata`. What exactly does `--autogenerate` compare, and what happens if someone edits a column in `models.py` but ships no new migration?
 2. **Tradeoff** — Why does Alembic keep an `alembic_version` table and a chain of revisions instead of just running idempotent `CREATE TABLE IF NOT EXISTS` scripts at startup? What does the chain buy you on downgrade?
 3. **Failure mode** — A deploy ships the new API but `alembic upgrade head` never ran against the production DB (or a migration dies halfway). What breaks first, and why does PostgreSQL's transactional DDL make the halfway case safe?
+
+## P1.2 — notebooks CRUD API (banked 2026-10-28)
+
+1. **Fundamental** — `NotebookName` uses `StringConstraints(strip_whitespace=True, min_length=1, max_length=100)`. For `{"name": "   "}`, where is it rejected, and why does strip-before-min_length turn a whitespace-only name into a 422 instead of an empty-named notebook?
+2. **Tradeoff** — Services return ORM `Notebook` objects and the router declares `response_model=NotebookRead` with `from_attributes=True`. What does that shortcut cost you (what does the router now depend on), and why does `from_attributes` keep the door open to return dicts/dataclasses later?
+3. **Failure mode** — `test_delete_notebook_cascades` only passes because of the DB-level `ON DELETE CASCADE` on `sources.notebook_id`. If that clause were dropped, what would the API's DELETE return instead of 204 — and why would an orphan-row outcome be worse than an error?
