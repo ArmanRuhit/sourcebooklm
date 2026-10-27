@@ -5,6 +5,7 @@ const API_URL = (
 ).replace(/\/$/, "");
 
 export type Notebook = components["schemas"]["NotebookRead"];
+export type Source = components["schemas"]["SourceRead"];
 
 export class ApiError extends Error {
   readonly status: number;
@@ -38,10 +39,15 @@ async function readErrorDetail(response: Response): Promise<string> {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData =
+    typeof FormData !== "undefined" && init?.body instanceof FormData;
+
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.body && !isFormData
+        ? { "Content-Type": "application/json" }
+        : {}),
       ...init?.headers,
     },
   });
@@ -93,4 +99,25 @@ export function renameNotebook(id: string, name: string): Promise<Notebook> {
 
 export async function deleteNotebook(id: string): Promise<void> {
   await request<void>(`/api/v1/notebooks/${id}`, { method: "DELETE" });
+}
+
+export function listSources(notebookId: string): Promise<Source[]> {
+  return request<Source[]>(`/api/v1/notebooks/${notebookId}/sources`, {
+    cache: "no-store",
+  });
+}
+
+export function uploadPdf(notebookId: string, file: File): Promise<Source> {
+  const body = new FormData();
+  body.append("kind", "pdf");
+  body.append("file", file);
+
+  return request<Source>(`/api/v1/notebooks/${notebookId}/sources`, {
+    method: "POST",
+    body,
+  });
+}
+
+export function getSourceFileUrl(sourceId: string): string {
+  return `${API_URL}/api/v1/sources/${sourceId}/file`;
 }

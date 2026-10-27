@@ -6,10 +6,11 @@ import pytest
 from sqlalchemy import select
 
 from app.db import async_session_factory
-from app.models import Notebook, Source, SourceContent
+from app.models import Notebook, Source, SourceContent, SourceFile
 from app.services.ingestion import worker
 from app.services.vector_store import delete_source, search_chunks
 from tests.helpers import FakeEmbeddings
+from tests.pdf_fixture import make_pdf
 
 
 @pytest.fixture
@@ -149,3 +150,72 @@ async def test_pipeline_indexes_searchable_chunks(notebook_id: uuid.UUID) -> Non
         assert any(document.metadata["source_id"] == str(source_id) for document, _ in results)
     finally:
         await delete_source(str(source_id))
+
+
+async def _create_pdf_source(notebook_id: uuid.UUID, *, data: bytes | None = None) -> uuid.UUID:
+    file_bytes = data if data is not None else make_pdf(["alpha beta", "gamma delta"])
+    async with async_session_factory() as session:
+        source = Source(
+            notebook_id=notebook_id,
+            kind="pdf",
+            title="PDF worker test",
+            config={"filename": "test.pdf", "size_bytes": len(file_bytes)},
+        )
+        session.add(source)
+        await session.flush()
+        session.add(
+            SourceFile(
+                source_id=source.id,
+                filename="test.pdf",
+                content_type="application/pdf",
+                size_bytes=len(file_bytes),
+                file_bytes=file_bytes,
+            )
+        )
+        await session.commit()
+        return source.id
+
+
+async def test_pdf_pipeline_keeps_page_metadata(notebook_id: uuid.UUID) -> None:
+    source_id = await _create_pdf_source(notebook_id)
+    embeddings = FakeEmbeddings()
+
+    try:
+        assert await worker.process_next(embeddings=embeddings) is True
+
+        async with async_session_factory() as session:
+            source = await session.get(Source, source_id)
+            assert source is not None
+            assert source.status == "ready"
+            assert source.chunk_count == 2
+            assert source.char_count == len("alpha beta\n\ngamma delta")
+
+            content = await session.get(SourceContent, source_id)
+            assert content is not None
+            assert content.text is None
+            assert content.pages is not None
+            assert [page["page"] for page in content.pages] == [1, 2]
+
+        results = await search_chunks(str(notebook_id), "alpha gamma", k=5, embeddings=embeddings)
+        pages = {
+            document.metadata["page"]
+            for document, _ in results
+            if document.metadata["source_id"] == str(source_id)
+        }
+        assert pages == {1, 2}
+    finally:
+        await delete_source(str(source_id))
+
+
+async def test_corrupt_pdf_marks_source_failed(notebook_id: uuid.UUID) -> None:
+    source_id = await _create_pdf_source(notebook_id, data=b"not a pdf")
+
+    assert await worker.process_next(embeddings=FakeEmbeddings()) is True
+
+    async with async_session_factory() as session:
+        source = await session.get(Source, source_id)
+        assert source is not None
+        assert source.status == "failed"
+        assert source.stage is None
+        assert source.error is not None
+        assert "Could not read PDF" in source.error

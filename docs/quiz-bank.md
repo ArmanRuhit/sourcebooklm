@@ -52,4 +52,10 @@
 
 1. **Fundamental** — Chunks use 1000 chars with 150 chars of overlap and keep `char_start`/`char_end`. What does the overlap protect against at retrieval time, and what would citations lose if the offsets were dropped?
 2. **Tradeoff** — Re-indexing deletes a source's vectors and re-adds them with deterministic `source_id:index` IDs. What does that buy (idempotency, no stale chunks) and what does it cost compared with upserting only changed chunks (embedding spend, a brief window with no vectors)?
-3. **Failure mode** — `langchain-postgres 0.0.19`'s `adelete(filter={...})` accepts a filter and silently deletes nothing. What would you observe after deleting or re-indexing a source, and how do you make the operation trustworthy? (The fix here deletes by `cmetadata->>'source_id'` in SQL.)
+3. **Failure mode** — `langchain-postgres 0.0.19`'s `adelete(filter={...})` accepts a filter and silently deletes nothing. What would you observe after deleting or re-indexing a source, and how do you make the operation trustworthy? (The fix deletes by `cmetadata->>'source_id'` in SQL.)
+
+## P2.3 — PDF ingestion + viewer (banked 2026-10-28)
+
+1. **Fundamental** — `split_pages` chunks each page separately and keeps `char_start`/`char_end` relative to that page. Why is page-relative better than one global character offset for citations, and what breaks if chunk text is allowed to overlap across a page boundary?
+2. **Tradeoff** — PDF bytes live in Postgres (`source_files.bytea`) instead of S3 or the filesystem. What does that buy for a small single-service app (transactional delete, one backup, simple local dev) and what does it cost (database size, write amplification, memory pressure when streaming large files)?
+3. **Failure mode** — `useSources` polls only while the current list has an active source. After the initial list settles, a newly uploaded source is added locally as `queued` — why did polling never restart, and what is the minimal fix? (Here, `addSource` bumps the effect's `reloadKey`.)

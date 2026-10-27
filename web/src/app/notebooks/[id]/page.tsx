@@ -5,21 +5,27 @@ import { useParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   ArrowLeftIcon,
-  FileStackIcon,
   MessageSquareIcon,
-  PlusIcon,
   RefreshCwIcon,
   SearchXIcon,
   SendIcon,
+  XIcon,
 } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
+import { AddSourceDialog } from "@/components/sources/add-source-dialog";
+import { PdfViewerPanel } from "@/components/sources/pdf-viewer-panel";
+import { SourceList } from "@/components/sources/source-list";
 import { Button } from "@/components/ui/button";
+import { useSources } from "@/hooks/use-sources";
 import {
   ApiError,
   getErrorMessage,
   getNotebook,
+  getSourceFileUrl,
+  uploadPdf,
   type Notebook,
+  type Source,
 } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
 
@@ -160,6 +166,23 @@ function NotebookPageContent() {
 
   const { notebook } = state;
 
+  return <NotebookWorkspace notebook={notebook} />;
+}
+
+function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
+  const { sources, error: sourcesError, reload, addSource } = useSources(
+    notebook.id,
+  );
+  const [addOpen, setAddOpen] = useState(false);
+  const [viewer, setViewer] = useState<{ source: Source; page: number } | null>(
+    null,
+  );
+
+  async function handleUpload(file: File) {
+    const source = await uploadPdf(notebook.id, file);
+    addSource(source);
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeader />
@@ -181,26 +204,21 @@ function NotebookPageContent() {
           </p>
         </div>
 
-        <div className="grid flex-1 gap-4 lg:grid-cols-[320px_1fr]">
-          <aside className="flex min-h-72 flex-col rounded-xl border bg-card">
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <h2 className="text-sm font-medium">Sources</h2>
-              <Button size="sm" variant="outline" disabled>
-                <PlusIcon />
-                Add
-              </Button>
-            </div>
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-10 text-center">
-              <div className="flex size-11 items-center justify-center rounded-full bg-muted">
-                <FileStackIcon className="size-5 text-muted-foreground" />
-              </div>
-              <p className="text-sm font-medium">No sources yet</p>
-              <p className="max-w-56 text-xs text-muted-foreground">
-                PDFs, web pages, YouTube videos, text, and VTT transcripts land
-                here in Phase 2.
-              </p>
-            </div>
-          </aside>
+        <div
+          className={`grid flex-1 gap-4 lg:grid-cols-[320px_1fr] ${
+            viewer
+              ? "xl:grid-cols-[300px_minmax(0,1fr)_minmax(360px,1fr)]"
+              : ""
+          }`}
+        >
+          <SourceList
+            sources={sources}
+            error={sourcesError}
+            activeSourceId={viewer?.source.id}
+            onAdd={() => setAddOpen(true)}
+            onRetry={reload}
+            onOpen={(source) => setViewer({ source, page: 1 })}
+          />
 
           <section className="flex min-h-96 flex-col rounded-xl border bg-card">
             <div className="flex items-center justify-between border-b px-4 py-3">
@@ -211,7 +229,9 @@ function NotebookPageContent() {
               <div className="flex size-11 items-center justify-center rounded-full bg-muted">
                 <MessageSquareIcon className="size-5 text-muted-foreground" />
               </div>
-              <p className="text-sm font-medium">Grounded answers will appear here</p>
+              <p className="text-sm font-medium">
+                Grounded answers will appear here
+              </p>
               <p className="max-w-sm text-xs text-muted-foreground">
                 Add a source, then ask a question. Every answer will cite the
                 exact passage it came from.
@@ -229,8 +249,39 @@ function NotebookPageContent() {
               </div>
             </div>
           </section>
+
+          {viewer && (
+            <section className="flex min-h-96 flex-col rounded-xl border bg-card">
+              <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+                <h2 className="truncate text-sm font-medium">
+                  {viewer.source.title}
+                </h2>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  aria-label="Close viewer"
+                  onClick={() => setViewer(null)}
+                >
+                  <XIcon />
+                </Button>
+              </div>
+              <PdfViewerPanel
+                key={viewer.source.id}
+                url={getSourceFileUrl(viewer.source.id)}
+                initialPage={viewer.page}
+              />
+            </section>
+          )}
         </div>
       </main>
+
+      {addOpen && (
+        <AddSourceDialog
+          open={addOpen}
+          onOpenChange={setAddOpen}
+          onUpload={handleUpload}
+        />
+      )}
     </div>
   );
 }

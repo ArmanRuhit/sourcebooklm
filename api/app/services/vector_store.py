@@ -126,6 +126,7 @@ async def index_chunks(
                     "title": title,
                     "char_start": chunk.char_start,
                     "char_end": chunk.char_end,
+                    **({"page": chunk.page} if chunk.page is not None else {}),
                 }
                 for chunk in batch
             ],

@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-28 · Status: **P2.2 complete — text pipeline live (chunk 1000/150, LangGraph extract→chunk→embed, PGVector + HNSW, notebook-filtered search); P2.3 (PDF upload + viewer) up next**
+Last updated: 2026-10-28 · Status: **P2.3 complete — PDFs upload, stream, extract page-by-page, and open in the workspace viewer; P2.4 (website URL ingestion) up next**
 
 ## 1. Mission & success criteria
 
@@ -232,7 +232,7 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 
 - [x] P2.1 Source API + worker skeleton (status machine, claim loop, crash recovery)
 - [x] P2.2 Text source end-to-end: chunk → embed → pgvector → `ready`
-- [ ] P2.3 PDF: upload, bytea storage, file serving, viewer opens at page
+- [x] P2.3 PDF: upload, bytea storage, file serving, viewer opens at page
 - [ ] P2.4 Website URL extraction
 - [ ] P2.5 YouTube transcript extraction (timestamped segments)
 - [ ] P2.6 VTT transcript parsing
@@ -461,6 +461,17 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - **Manual evidence**: with deterministic test embeddings, a 1608-char text source reached `ready` with `chunk_count=2`; filtered search returned both chunks (best distance 0.8835). Live API without a key: `queued → failed` with “OPENAI_API_KEY is not configured…”. With a real key: a ~1.1k-char source reached `ready` (`chunk_count=2`) in 9s, and `smoke_search` returned both chunks (distances 0.4715 / 0.6141) with correct metadata. `langchain_pg_*` tables and the HNSW index exist; test vectors cleaned to zero.
 - **Real-key smoke is green** (2026-10-28). P2.7 still owns the re-index/retry UX.
 - **Next: P2.3 — PDF** (multipart upload cap + type check, `source_files` bytea, per-page extractor, streaming file endpoint, PDF viewer opening at a page).
+
+### 2026-10-28 — P2.3 complete (PDF ingestion + viewer)
+
+- **Upload API**: `POST /notebooks/{id}/sources` now accepts `kind=pdf` with a multipart `file` (`pypdf` added). It caps at `MAX_UPLOAD_MB` (20), rejects empty/non-PDF payloads by sniffing `%PDF-` rather than trusting the browser type, returns `413` for oversize, `422` for bad content, and stores bytes in `source_files.bytea` with a sanitized filename. `GET /sources/{id}/file` streams 64 KiB chunks with `Content-Length`, inline `Content-Disposition`, `private` caching, and `nosniff`.
+- **Extraction**: `ingestion/pdf.py` reads page text with pypdf; password-protected, corrupt, and scan-only PDFs become clear `IngestionError`s. `_extract` saves a page snapshot to `source_contents.pages` and joins the text for the existing search snapshot.
+- **Page-aware chunks**: `split_pages` chunks each page independently so overlap never crosses a page boundary; offsets stay page-relative and every vector carries `page`. This is what lets a citation open the viewer at the cited page (wired in P3).
+- **Workspace UI**: Sources panel lists real sources with status dots, polling every 2 s while anything is queued/processing; the Add dialog shows all five tiles but only PDF is active; the PDF viewer uses `react-pdf` + a bundled pdf.js worker, with page controls and a third column from `xl` up (stacked on mobile). Viewer starts at page 1 today; citation-driven pages arrive with chat.
+- **Polling bug fixed**: the 2 s chain stopped once the pre-upload list was settled, so a newly added source stayed “Queued” until reload. `addSource` now restarts the polling effect via `reloadKey`; verified a third upload went Queued → Ready in 2.4 s with no reload.
+- **Tests** (14 new, 44 total): page extraction/encryption/corruption/scan-only; upload size/type/magic/title/404 cases; streamed bytes + headers; PDF pipeline page metadata; corrupt PDF failure. `ruff check`, `ruff format --check`, `mypy` (22 files), `pytest -q` all green.
+- **Manual evidence**: live 995 B PDF → `ready` in ~2 s with `chunk_count=2`, `char_count=161`; streamed file byte-identical with correct headers; browser viewer showed “Page 1 of 2” → “Page 2 of 2” and the extracted text; upload through the dialog rendered the new source and polling settled it without a refresh. Sources cleaned up; list back to `[]`.
+- **Next: P2.4 — website URL ingestion** (fetch with timeout/size guard, HTML → readable text, per-source metadata, same pipeline, UI tile live).
 
 ## 12. Docs map
 

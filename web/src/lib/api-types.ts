@@ -71,7 +71,7 @@ export interface paths {
         put?: never;
         /**
          * Create Source
-         * @description Add a text source; the worker picks it up from the queue.
+         * @description Add a text or PDF source; the worker picks it up from the queue.
          */
         post: operations["create_source_api_v1_notebooks__notebook_id__sources_post"];
         delete?: never;
@@ -104,6 +104,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sources/{source_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Source File
+         * @description Stream the original uploaded PDF.
+         */
+        get: operations["get_source_file_api_v1_sources__source_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -128,6 +148,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Body_create_source_api_v1_notebooks__notebook_id__sources_post */
+        Body_create_source_api_v1_notebooks__notebook_id__sources_post: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "pdf";
+            /** Title */
+            title?: string | null;
+            /** Text */
+            text?: string | null;
+            /** File */
+            file?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -171,24 +205,6 @@ export interface components {
         NotebookUpdate: {
             /** Name */
             name: string;
-        };
-        /**
-         * SourceCreate
-         * @description Multipart form fields for POST /notebooks/{id}/sources.
-         *
-         *     P2.1 accepts text only; each later source kind widens the literal and
-         *     adds its own payload fields.
-         */
-        SourceCreate: {
-            /**
-             * Kind
-             * @constant
-             */
-            kind: "text";
-            /** Title */
-            title?: string | null;
-            /** Text */
-            text: string;
         };
         /**
          * SourceRead
@@ -452,7 +468,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/x-www-form-urlencoded": components["schemas"]["SourceCreate"];
+                "multipart/form-data": components["schemas"]["Body_create_source_api_v1_notebooks__notebook_id__sources_post"];
             };
         };
         responses: {
@@ -524,6 +540,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_source_file_api_v1_sources__source_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {

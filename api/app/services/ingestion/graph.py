@@ -11,12 +11,14 @@ from typing import Any, TypedDict, cast
 from langchain_core.embeddings import Embeddings
 from langgraph.graph import END, START, StateGraph
 from sqlalchemy import CursorResult, func, update
+from starlette.concurrency import run_in_threadpool
 
 from app.db import async_session_factory
-from app.models import Source, SourceContent
+from app.models import Source, SourceContent, SourceFile
 from app.services import vector_store
-from app.services.ingestion.chunker import Chunk, split_text
+from app.services.ingestion.chunker import Chunk, split_pages, split_text
 from app.services.ingestion.errors import IngestionError
+from app.services.ingestion.pdf import extract_pages
 
 
 class IngestState(TypedDict, total=False):
@@ -27,6 +29,7 @@ class IngestState(TypedDict, total=False):
     kind: str
     title: str
     text: str
+    pages: list[dict[str, Any]]
     chunks: list[Chunk]
 
 
@@ -40,13 +43,39 @@ async def _set_stage(source_id: uuid.UUID, stage: str) -> None:
 
 
 async def _extract(state: IngestState) -> dict[str, Any]:
-    """Load the text snapshot and advance to chunking."""
+    """Load text (or extract PDF pages) and advance to chunking."""
     source_id = uuid.UUID(state["source_id"])
 
     async with async_session_factory() as session:
         source = await session.get(Source, source_id)
         if source is None:
             raise IngestionError("Source disappeared before extraction")
+
+        if source.kind == "pdf":
+            uploaded = await session.get(SourceFile, source_id)
+            if uploaded is None:
+                raise IngestionError("Uploaded PDF is missing")
+
+            pages = await run_in_threadpool(extract_pages, uploaded.file_bytes)
+            text = "\n\n".join(page["text"] for page in pages)
+            content = await session.get(SourceContent, source_id)
+            if content is None:
+                content = SourceContent(source_id=source_id)
+                session.add(content)
+            content.text = None
+            content.pages = pages
+
+            source.char_count = len(text)
+            source.stage = "chunking"
+            await session.commit()
+
+            return {
+                "text": text,
+                "pages": pages,
+                "notebook_id": str(source.notebook_id),
+                "kind": source.kind,
+                "title": source.title,
+            }
 
         content = await session.get(SourceContent, source_id)
         if content is None or not content.text:
@@ -68,7 +97,13 @@ async def _extract(state: IngestState) -> dict[str, Any]:
 async def _chunk(state: IngestState) -> dict[str, Any]:
     """Split the snapshot into overlapping, offset-aware chunks."""
     try:
-        chunks = split_text(state["text"])
+        if state.get("pages"):
+            chunks = await run_in_threadpool(
+                split_pages,
+                ((int(page["page"]), str(page["text"])) for page in state["pages"]),
+            )
+        else:
+            chunks = split_text(state["text"])
     except ValueError as exc:
         raise IngestionError(str(exc)) from exc
 

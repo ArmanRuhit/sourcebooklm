@@ -1,17 +1,28 @@
 """Source endpoints - HTTP shape only; logic lives in the service layer."""
 
 import uuid
-from typing import Annotated
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Annotated, Literal
+from urllib.parse import quote
 
-from fastapi import APIRouter, Form, HTTPException, status
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
 
-from app.models import Source
+from app.config import settings
+from app.models import Source, SourceFile
 from app.routers.deps import NotebookDep, SessionDep
 from app.schemas import SourceCreate, SourceRead
 from app.services import sources
 
 notebook_sources_router = APIRouter(prefix="/notebooks", tags=["sources"])
 sources_router = APIRouter(prefix="/sources", tags=["sources"])
+
+PDF_MAGIC = b"%PDF-"
+MAX_FILENAME_LENGTH = 255
+STREAM_CHUNK_SIZE = 64 * 1024
 
 
 async def _get_source_or_404(session: SessionDep, source_id: uuid.UUID) -> Source:
@@ -20,6 +31,24 @@ async def _get_source_or_404(session: SessionDep, source_id: uuid.UUID) -> Sourc
     if source is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source not found")
     return source
+
+
+def _clean_title(title: str | None) -> str | None:
+    """Normalize the optional title and enforce the database bound."""
+    cleaned = (title or "").strip()
+    if not cleaned:
+        return None
+    if len(cleaned) > 200:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Title must be 200 characters or fewer",
+        )
+    return cleaned
+
+
+def _iter_bytes(data: bytes) -> Iterator[bytes]:
+    for start in range(0, len(data), STREAM_CHUNK_SIZE):
+        yield data[start : start + STREAM_CHUNK_SIZE]
 
 
 @notebook_sources_router.get("/{notebook_id}/sources", response_model=list[SourceRead])
@@ -36,16 +65,83 @@ async def list_sources(notebook: NotebookDep, session: SessionDep) -> list[Sourc
 async def create_source(
     notebook: NotebookDep,
     session: SessionDep,
-    payload: Annotated[SourceCreate, Form()],
+    kind: Annotated[Literal["text", "pdf"], Form()],
+    title: Annotated[str | None, Form()] = None,
+    text: Annotated[str | None, Form()] = None,
+    file: Annotated[UploadFile | None, File()] = None,
 ) -> Source:
-    """Add a text source; the worker picks it up from the queue."""
-    return await sources.create(session, notebook.id, payload)
+    """Add a text or PDF source; the worker picks it up from the queue."""
+    if kind == "text":
+        if file is not None and file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Files are only supported for PDF sources",
+            )
+        try:
+            payload = SourceCreate(kind="text", title=title, text=text or "")
+        except ValidationError as exc:
+            raise RequestValidationError(exc.errors()) from exc
+        return await sources.create(session, notebook.id, payload)
+
+    if file is None or not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="A PDF file is required",
+        )
+
+    max_bytes = settings.max_upload_mb * 1024 * 1024
+    data = await file.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"PDF must be {settings.max_upload_mb} MB or smaller",
+        )
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="The uploaded PDF is empty",
+        )
+    if PDF_MAGIC not in data[:1024]:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="File must be a PDF",
+        )
+
+    filename = Path(file.filename).name[-MAX_FILENAME_LENGTH:] or "document.pdf"
+    return await sources.create_pdf(
+        session,
+        notebook.id,
+        filename=filename,
+        data=data,
+        title=_clean_title(title),
+    )
 
 
 @sources_router.get("/{source_id}", response_model=SourceRead)
 async def get_source(source_id: uuid.UUID, session: SessionDep) -> Source:
     """Get one source."""
     return await _get_source_or_404(session, source_id)
+
+
+@sources_router.get("/{source_id}/file")
+async def get_source_file(source_id: uuid.UUID, session: SessionDep) -> StreamingResponse:
+    """Stream the original uploaded PDF."""
+    uploaded = await session.get(SourceFile, source_id)
+    if uploaded is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source file not found")
+
+    return StreamingResponse(
+        _iter_bytes(uploaded.file_bytes),
+        media_type=uploaded.content_type,
+        headers={
+            "Content-Disposition": (
+                f"inline; filename*=UTF-8''{quote(uploaded.filename, safe='')}"
+            ),
+            "Content-Length": str(uploaded.size_bytes),
+            "Cache-Control": "private, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @sources_router.delete("/{source_id}", status_code=status.HTTP_204_NO_CONTENT)

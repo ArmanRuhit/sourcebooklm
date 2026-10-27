@@ -1,11 +1,12 @@
 """Source service - database operations with no HTTP concerns."""
 
 import uuid
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Source, SourceContent
+from app.models import Source, SourceContent, SourceFile
 from app.schemas import SourceCreate
 from app.services import vector_store
 
@@ -17,6 +18,12 @@ def _title_from_text(text: str) -> str:
         if candidate:
             return candidate[:200]
     return "Untitled source"
+
+
+def _title_from_filename(filename: str) -> str:
+    """Use the filename stem as a fallback title."""
+    stem = Path(filename).stem.strip()
+    return stem[:200] if stem else "Untitled source"
 
 
 async def create(session: AsyncSession, notebook_id: uuid.UUID, data: SourceCreate) -> Source:
@@ -31,6 +38,38 @@ async def create(session: AsyncSession, notebook_id: uuid.UUID, data: SourceCrea
     await session.flush()  # assign source.id before inserting the content row
 
     session.add(SourceContent(source_id=source.id, text=data.text))
+    await session.commit()
+    await session.refresh(source)
+    return source
+
+
+async def create_pdf(
+    session: AsyncSession,
+    notebook_id: uuid.UUID,
+    *,
+    filename: str,
+    data: bytes,
+    title: str | None = None,
+) -> Source:
+    """Insert a queued PDF source plus its original bytes."""
+    source = Source(
+        notebook_id=notebook_id,
+        kind="pdf",
+        title=title or _title_from_filename(filename),
+        config={"filename": filename, "size_bytes": len(data)},
+    )
+    session.add(source)
+    await session.flush()
+
+    session.add(
+        SourceFile(
+            source_id=source.id,
+            filename=filename,
+            content_type="application/pdf",
+            size_bytes=len(data),
+            file_bytes=data,
+        )
+    )
     await session.commit()
     await session.refresh(source)
     return source
