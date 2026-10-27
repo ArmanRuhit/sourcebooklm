@@ -130,6 +130,20 @@ export function createUrlSource(notebookId: string, url: string): Promise<Source
   });
 }
 
+export function createYoutubeSource(
+  notebookId: string,
+  url: string,
+): Promise<Source> {
+  const body = new FormData();
+  body.append("kind", "youtube");
+  body.append("url", url);
+
+  return request<Source>(`/api/v1/notebooks/${notebookId}/sources`, {
+    method: "POST",
+    body,
+  });
+}
+
 export function getSourceContent(sourceId: string): Promise<SourceContent> {
   return request<SourceContent>(`/api/v1/sources/${sourceId}/content`, {
     cache: "no-store",

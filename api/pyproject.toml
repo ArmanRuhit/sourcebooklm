@@ -27,6 +27,7 @@ dependencies = [
     "pypdf==6.4.0",
     "requests==2.34.2",
     "beautifulsoup4>=4.15.0",
+    "youtube-transcript-api>=1.2.4",
 ]
 
 [dependency-groups]

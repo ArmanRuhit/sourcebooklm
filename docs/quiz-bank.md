@@ -65,3 +65,9 @@
 1. **Fundamental** — Before fetching a user-supplied URL, `validate_public_url` resolves the hostname and rejects non-global IPs. What attack does that block, and why is checking the hostname string alone insufficient? What gap remains with HTTP redirects?
 2. **Tradeoff** — The worker stores the extracted article text in `source_contents` instead of re-fetching the page when the viewer opens. What does that buy (stable citations, no network at view time, works after the page changes) and what does it cost (storage, staleness, no live refresh)?
 3. **Failure mode** — Unit tests mocked `fetch_article`, so they passed while the production dependency `bs4` was missing. Why did only live smoke catch it, what kind of test covers the real loader, and when is mocking the whole extractor the wrong boundary?
+
+## P2.5 — YouTube transcripts (banked 2026-10-28)
+
+1. **Fundamental** — `split_transcript` never splits inside a cue and overlaps one cue between chunks. Why does that preserve citation quality, and what do `start_seconds`/`end_seconds` mean for a chunk that spans several cues?
+2. **Tradeoff** — The viewer embeds YouTube's player instead of storing or transcoding the video. What does that avoid (bandwidth, storage, licensing) and what does it give up (offline playback, control over availability, embed restrictions)?
+3. **Failure mode** — The oEmbed title lookup is best-effort while the transcript fetch is fatal. Why is that split correct, and what would users see if a title failure were treated like a transcript failure?

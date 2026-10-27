@@ -45,7 +45,7 @@ const SOURCE_TILES: {
     label: "YouTube",
     description: "Video transcripts",
     icon: VideoIcon,
-    available: false,
+    available: true,
   },
   {
     key: "url",
@@ -75,6 +75,7 @@ type AddSourceDialogProps = {
   onOpenChange: (open: boolean) => void;
   onUpload: (file: File) => Promise<void>;
   onAddUrl: (url: string) => Promise<void>;
+  onAddYoutube: (url: string) => Promise<void>;
 };
 
 export function AddSourceDialog({
@@ -82,10 +83,11 @@ export function AddSourceDialog({
   onOpenChange,
   onUpload,
   onAddUrl,
+  onAddYoutube,
 }: AddSourceDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [mode, setMode] = useState<"tiles" | "url">("tiles");
+  const [mode, setMode] = useState<"tiles" | "url" | "youtube">("tiles");
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -151,7 +153,11 @@ export function AddSourceDialog({
     setError(null);
 
     try {
-      await onAddUrl(parsed.toString());
+      if (mode === "youtube") {
+        await onAddYoutube(parsed.toString());
+      } else {
+        await onAddUrl(parsed.toString());
+      }
       onOpenChange(false);
     } catch (caught) {
       setError(getErrorMessage(caught));
@@ -165,8 +171,7 @@ export function AddSourceDialog({
         <DialogHeader>
           <DialogTitle>Add a source</DialogTitle>
           <DialogDescription>
-            Upload a PDF or add an article link. Other source types arrive in
-            the next slices.
+            Upload a PDF, add an article link, or paste a YouTube URL.
           </DialogDescription>
         </DialogHeader>
 
@@ -179,24 +184,30 @@ export function AddSourceDialog({
           tabIndex={-1}
         />
 
-        {mode === "url" ? (
+        {mode === "url" || mode === "youtube" ? (
           <form onSubmit={handleUrlSubmit} className="grid gap-3" noValidate>
             <div className="grid gap-1.5">
               <label htmlFor="source-url" className="text-xs font-medium">
-                Article URL
+                {mode === "youtube" ? "YouTube URL" : "Article URL"}
               </label>
               <Input
                 id="source-url"
                 type="url"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                placeholder="https://example.com/article"
+                placeholder={
+                  mode === "youtube"
+                    ? "https://www.youtube.com/watch?v=..."
+                    : "https://example.com/article"
+                }
                 autoFocus
                 disabled={addingUrl}
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              We&apos;ll fetch the page, keep a text snapshot, and index it.
+              {mode === "youtube"
+                ? "We'll pull the English transcript and index it with timestamps."
+                : "We'll fetch the page, keep a text snapshot, and index it."}
             </p>
 
             {error && (
@@ -220,10 +231,16 @@ export function AddSourceDialog({
               <Button type="submit" disabled={addingUrl || !url.trim()}>
                 {addingUrl ? (
                   <Loader2Icon className="animate-spin" />
+                ) : mode === "youtube" ? (
+                  <VideoIcon />
                 ) : (
                   <Link2Icon />
                 )}
-                {addingUrl ? "Adding..." : "Add link"}
+                {addingUrl
+                  ? "Adding..."
+                  : mode === "youtube"
+                    ? "Add video"
+                    : "Add link"}
               </Button>
             </div>
           </form>
@@ -285,6 +302,9 @@ export function AddSourceDialog({
                         inputRef.current?.click();
                       } else if (tile.key === "url") {
                         setMode("url");
+                        setError(null);
+                      } else if (tile.key === "youtube") {
+                        setMode("youtube");
                         setError(null);
                       }
                     }}

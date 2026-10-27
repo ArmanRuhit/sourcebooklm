@@ -127,6 +127,12 @@ async def index_chunks(
                     "char_start": chunk.char_start,
                     "char_end": chunk.char_end,
                     **({"page": chunk.page} if chunk.page is not None else {}),
+                    **(
+                        {"start_seconds": chunk.start_seconds}
+                        if chunk.start_seconds is not None
+                        else {}
+                    ),
+                    **({"end_seconds": chunk.end_seconds} if chunk.end_seconds is not None else {}),
                 }
                 for chunk in batch
             ],

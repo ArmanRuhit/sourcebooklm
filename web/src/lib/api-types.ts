@@ -174,7 +174,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "text" | "pdf" | "url";
+            kind: "text" | "pdf" | "url" | "youtube";
             /** Title */
             title?: string | null;
             /** Text */
@@ -237,6 +237,10 @@ export interface components {
             text: string | null;
             /** Pages */
             pages: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Segments */
+            segments: {
                 [key: string]: unknown;
             }[] | null;
         };

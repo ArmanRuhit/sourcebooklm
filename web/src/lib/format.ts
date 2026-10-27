@@ -46,3 +46,18 @@ export function formatFileSize(bytes: number): string {
 
   return `${(kilobytes / 1024).toFixed(1)} MB`;
 }
+
+export function formatTimestamp(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const remainder = total % 60;
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${remainder
+      .toString()
+      .padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+}

@@ -78,6 +78,19 @@ class SourceUrlCreate(BaseModel):
         return value or None
 
 
+class SourceYoutubeCreate(BaseModel):
+    """Multipart form fields for a YouTube source."""
+
+    kind: Literal["youtube"]
+    title: SourceTitle | None = None
+    url: HttpUrl
+
+    @field_validator("title")
+    @classmethod
+    def _blank_title_to_none(cls, value: str | None) -> str | None:
+        return value or None
+
+
 class SourceContentRead(BaseModel):
     """Stored text snapshot, used by the web viewer."""
 
@@ -85,6 +98,7 @@ class SourceContentRead(BaseModel):
 
     text: str | None
     pages: list[dict[str, Any]] | None
+    segments: list[dict[str, Any]] | None
 
 
 class SourceRead(BaseModel):

@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-28 · Status: **P2.4 complete — website URLs fetch to readable text, index, and open in the workspace viewer; P2.5 (YouTube transcripts) up next**
+Last updated: 2026-10-28 · Status: **P2.5 complete — YouTube URLs fetch English transcripts with timestamped chunks, an oEmbed title, and a seekable player/transcript viewer; P2.6 (VTT transcripts) up next**
 
 ## 1. Mission & success criteria
 
@@ -234,7 +234,7 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 - [x] P2.2 Text source end-to-end: chunk → embed → pgvector → `ready`
 - [x] P2.3 PDF: upload, bytea storage, file serving, viewer opens at page
 - [x] P2.4 Website URL extraction
-- [ ] P2.5 YouTube transcript extraction (timestamped segments)
+- [x] P2.5 YouTube transcript extraction (timestamped segments)
 - [ ] P2.6 VTT transcript parsing
 - [ ] P2.7 Remove / re-index / failure states + status polling UI
 
@@ -483,6 +483,16 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - **Tests** (16 new, 60 total): public/private URL validation, URL creation and config, invalid URL cases, content endpoint + 404, a real local-HTML `WebBaseLoader` round trip, and mocked URL pipeline success/failure with vector metadata. `ruff check`, `ruff format --check`, `mypy` (23 files), and `pytest -q` are green.
 - **Manual evidence**: live ingest of `https://example.com` reached `ready` in ~1 s with `chunk_count=1`, `char_count=170`, title “Example Domain”, and a newline-separated text snapshot; the viewer rendered the text and an `Open original` link to `https://example.com/`. Adding a second link through the dialog reached Ready without a refresh; both smoke sources were deleted (list `[]`).
 - **Next: P2.5 — YouTube** (`youtube-transcript-api` segments with start/duration, oEmbed title, timestamped chunk metadata, watch/youtu.be/shorts URL forms).
+
+### 2026-10-28 — P2.5 complete (YouTube transcripts)
+
+- **URL handling**: `extract_video_id` accepts `watch?v=`, `youtu.be/`, `/shorts/`, `/embed/`, `/live/`, and `/v/` forms on an allowlist of YouTube hosts. Invalid or non-video URLs become a 422 at create time, before anything is queued.
+- **Extraction**: `fetch_transcript` calls `youtube-transcript-api` for English variants and keeps `(text, start, end)` cues; missing/disabled/age-restricted/blocked transcripts map to specific `IngestionError` messages. The title comes from YouTube oEmbed and is best-effort — a failed title lookup never fails the source.
+- **Pipeline**: `_extract` stores the joined transcript as `source_contents.text`, the cue list as `segments`, and `char_count`; it replaces the placeholder title (“YouTube video”) with the video title unless the user supplied one, and records `final_url`/`video_id`. `split_transcript` packs cues up to 1000 chars without splitting one, adds a one-cue overlap, and stamps each chunk with `start_seconds`/`end_seconds`; PGVector metadata carries both.
+- **Web**: the YouTube tile and URL form are live. A ready video opens an embedded player plus a transcript list; clicking a cue seeks the iframe (`?start=…`), and the active cue is highlighted. Video rows show “YouTube” and open any ready source.
+- **Tests** (17 new, 77 total): URL-form parsing/rejections; source creation and config; mocked transcript pipeline success/failure with segment and vector metadata; timed-chunk packing, one-cue overlap, offsets, and empty-cue failure. `ruff check`, `ruff format --check`, `mypy` (23 files), and `pytest -q` are green.
+- **Manual evidence**: live ingest of `youtube.com/watch?v=jNQXAC9IVRw` reached `ready` in ~5 s with `chunk_count=1`, `char_count=217`, 6 segments, and title “Me at the zoo”. The viewer rendered the player + 6 cues; clicking `0:01` and `0:12` changed the iframe `start` parameter accordingly, with no console errors. Source deleted; list back to `[]`.
+- **Next: P2.6 — VTT transcript parsing** (timestamped cues, same chunk path, upload + viewer).
 
 ## 12. Docs map
 

@@ -17,11 +17,13 @@ import { AddSourceDialog } from "@/components/sources/add-source-dialog";
 import { PdfViewerPanel } from "@/components/sources/pdf-viewer-panel";
 import { SourceList } from "@/components/sources/source-list";
 import { TextSourceViewer } from "@/components/sources/text-source-viewer";
+import { YoutubeSourceViewer } from "@/components/sources/youtube-source-viewer";
 import { Button } from "@/components/ui/button";
 import { useSources } from "@/hooks/use-sources";
 import {
   ApiError,
   createUrlSource,
+  createYoutubeSource,
   getErrorMessage,
   getNotebook,
   getSourceFileUrl,
@@ -176,9 +178,11 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
     notebook.id,
   );
   const [addOpen, setAddOpen] = useState(false);
-  const [viewer, setViewer] = useState<{ source: Source; page: number } | null>(
-    null,
-  );
+  const [viewer, setViewer] = useState<{
+    source: Source;
+    page: number;
+    startSeconds: number;
+  } | null>(null);
 
   async function handleUpload(file: File) {
     const source = await uploadPdf(notebook.id, file);
@@ -187,6 +191,11 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
 
   async function handleAddUrl(url: string) {
     const source = await createUrlSource(notebook.id, url);
+    addSource(source);
+  }
+
+  async function handleAddYoutube(url: string) {
+    const source = await createYoutubeSource(notebook.id, url);
     addSource(source);
   }
 
@@ -224,7 +233,9 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
             activeSourceId={viewer?.source.id}
             onAdd={() => setAddOpen(true)}
             onRetry={reload}
-            onOpen={(source) => setViewer({ source, page: 1 })}
+            onOpen={(source) =>
+              setViewer({ source, page: 1, startSeconds: 0 })
+            }
           />
 
           <section className="flex min-h-96 flex-col rounded-xl border bg-card">
@@ -278,6 +289,12 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
                   url={getSourceFileUrl(viewer.source.id)}
                   initialPage={viewer.page}
                 />
+              ) : viewer.source.kind === "youtube" ? (
+                <YoutubeSourceViewer
+                  key={viewer.source.id}
+                  source={viewer.source}
+                  initialStartSeconds={viewer.startSeconds}
+                />
               ) : (
                 <TextSourceViewer
                   key={viewer.source.id}
@@ -295,6 +312,7 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
           onOpenChange={setAddOpen}
           onUpload={handleUpload}
           onAddUrl={handleAddUrl}
+          onAddYoutube={handleAddYoutube}
         />
       )}
     </div>

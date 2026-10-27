@@ -16,10 +16,10 @@ from starlette.concurrency import run_in_threadpool
 from app.db import async_session_factory
 from app.models import Source, SourceContent, SourceFile
 from app.services import vector_store
-from app.services.ingestion.chunker import Chunk, split_pages, split_text
+from app.services.ingestion.chunker import Chunk, split_pages, split_text, split_transcript
 from app.services.ingestion.errors import IngestionError
 from app.services.ingestion.pdf import extract_pages
-from app.services.ingestion.web import fetch_article
+from app.services.ingestion.web import fetch_article, fetch_transcript
 
 
 class IngestState(TypedDict, total=False):
@@ -31,6 +31,7 @@ class IngestState(TypedDict, total=False):
     title: str
     text: str
     pages: list[dict[str, Any]]
+    segments: list[dict[str, Any]]
     chunks: list[Chunk]
 
 
@@ -51,6 +52,45 @@ async def _extract(state: IngestState) -> dict[str, Any]:
         source = await session.get(Source, source_id)
         if source is None:
             raise IngestionError("Source disappeared before extraction")
+
+        if source.kind == "youtube":
+            config = dict(source.config or {})
+            video = await run_in_threadpool(fetch_transcript, str(config.get("url") or ""))
+
+            segments: list[dict[str, Any]] = [
+                {
+                    "text": text,
+                    "start_seconds": start,
+                    "end_seconds": end,
+                }
+                for text, start, end in video.cues
+            ]
+            content = await session.get(SourceContent, source_id)
+            if content is None:
+                content = SourceContent(source_id=source_id)
+                session.add(content)
+            content.text = "\n".join(text for text, _, _ in video.cues)
+            content.pages = None
+            content.segments = segments
+
+            source.char_count = len(content.text)
+            source.stage = "chunking"
+            if not config.get("custom_title") and video.title:
+                source.title = video.title
+            source.config = {
+                **config,
+                "final_url": video.url,
+                "video_id": video.video_id,
+            }
+            await session.commit()
+
+            return {
+                "text": content.text,
+                "segments": segments,
+                "notebook_id": str(source.notebook_id),
+                "kind": source.kind,
+                "title": source.title,
+            }
 
         if source.kind == "url":
             config = dict(source.config or {})
@@ -127,7 +167,19 @@ async def _extract(state: IngestState) -> dict[str, Any]:
 async def _chunk(state: IngestState) -> dict[str, Any]:
     """Split the snapshot into overlapping, offset-aware chunks."""
     try:
-        if state.get("pages"):
+        if state.get("segments"):
+            chunks = await run_in_threadpool(
+                split_transcript,
+                [
+                    (
+                        str(segment["text"]),
+                        float(segment["start_seconds"]),
+                        float(segment["end_seconds"]),
+                    )
+                    for segment in state["segments"]
+                ],
+            )
+        elif state.get("pages"):
             chunks = await run_in_threadpool(
                 split_pages,
                 ((int(page["page"]), str(page["text"])) for page in state["pages"]),

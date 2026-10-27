@@ -138,7 +138,11 @@ async def test_content_endpoint_returns_snapshot(
 
     content = await client.get(f"/api/v1/sources/{source_id}/content")
     assert content.status_code == 200
-    assert content.json() == {"text": "Stored viewer text", "pages": None}
+    assert content.json() == {
+        "text": "Stored viewer text",
+        "pages": None,
+        "segments": None,
+    }
 
     await client.delete(f"/api/v1/sources/{source_id}")
     missing = await client.get(f"/api/v1/sources/{source_id}/content")

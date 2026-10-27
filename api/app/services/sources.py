@@ -70,6 +70,31 @@ async def create_url(
     return source
 
 
+async def create_youtube(
+    session: AsyncSession,
+    notebook_id: uuid.UUID,
+    *,
+    video_id: str,
+    url: str,
+    title: str | None = None,
+) -> Source:
+    """Insert a queued YouTube source; the worker fetches its transcript."""
+    source = Source(
+        notebook_id=notebook_id,
+        kind="youtube",
+        title=title or "YouTube video",
+        config={
+            "url": url,
+            "video_id": video_id,
+            "custom_title": title is not None,
+        },
+    )
+    session.add(source)
+    await session.commit()
+    await session.refresh(source)
+    return source
+
+
 async def create_pdf(
     session: AsyncSession,
     notebook_id: uuid.UUID,

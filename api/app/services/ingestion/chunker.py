@@ -23,6 +23,8 @@ class Chunk:
     char_start: int
     char_end: int
     page: int | None = None
+    start_seconds: float | None = None
+    end_seconds: float | None = None
 
 
 def _splitter() -> RecursiveCharacterTextSplitter:
@@ -72,4 +74,59 @@ def split_pages(pages: Iterable[tuple[int, str]]) -> list[Chunk]:
 
     if not chunks:
         raise ValueError("Cannot chunk PDF with no extractable text")
+    return chunks
+
+
+def split_transcript(
+    cues: Iterable[tuple[str, float, float]],
+) -> list[Chunk]:
+    """Group timed cues into ~1000-char chunks without splitting a cue.
+
+    Each cue is ``(text, start_seconds, end_seconds)``. Chunks keep one cue of
+    overlap, the first cue's start, and the last cue's end, so a citation can
+    seek to the exact spoken range.
+    """
+    prepared: list[tuple[str, float, float, int]] = []
+    offset = 0
+
+    for text, start, end in cues:
+        cleaned = text.strip()
+        if not cleaned:
+            continue
+        prepared.append((cleaned, start, end, offset))
+        offset += len(cleaned) + 1
+
+    if not prepared:
+        raise ValueError("Cannot chunk transcript with no cues")
+
+    chunks: list[Chunk] = []
+    current: list[tuple[str, float, float, int]] = []
+    size = 0
+
+    def flush() -> None:
+        if not current:
+            return
+        text = " ".join(cue[0] for cue in current)
+        chunks.append(
+            Chunk(
+                text=text,
+                index=len(chunks),
+                char_start=current[0][3],
+                char_end=current[-1][3] + len(current[-1][0]),
+                start_seconds=round(current[0][1], 2),
+                end_seconds=round(current[-1][2], 2),
+            )
+        )
+
+    for cue in prepared:
+        addition = len(cue[0]) + (1 if current else 0)
+        if current and size + addition > CHUNK_SIZE:
+            flush()
+            current = [current[-1], cue]
+            size = len(current[0][0]) + 1 + len(cue[0])
+        else:
+            current.append(cue)
+            size += addition
+
+    flush()
     return chunks

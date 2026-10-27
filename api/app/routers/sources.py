@@ -14,8 +14,16 @@ from pydantic import ValidationError
 from app.config import settings
 from app.models import Source, SourceContent, SourceFile
 from app.routers.deps import NotebookDep, SessionDep
-from app.schemas import SourceContentRead, SourceCreate, SourceRead, SourceUrlCreate
+from app.schemas import (
+    SourceContentRead,
+    SourceCreate,
+    SourceRead,
+    SourceUrlCreate,
+    SourceYoutubeCreate,
+)
 from app.services import sources
+from app.services.ingestion.errors import IngestionError
+from app.services.ingestion.web import extract_video_id
 
 notebook_sources_router = APIRouter(prefix="/notebooks", tags=["sources"])
 sources_router = APIRouter(prefix="/sources", tags=["sources"])
@@ -65,7 +73,7 @@ async def list_sources(notebook: NotebookDep, session: SessionDep) -> list[Sourc
 async def create_source(
     notebook: NotebookDep,
     session: SessionDep,
-    kind: Annotated[Literal["text", "pdf", "url"], Form()],
+    kind: Annotated[Literal["text", "pdf", "url", "youtube"], Form()],
     title: Annotated[str | None, Form()] = None,
     text: Annotated[str | None, Form()] = None,
     url: Annotated[str | None, Form()] = None,
@@ -101,6 +109,33 @@ async def create_source(
             notebook.id,
             url=str(url_payload.url),
             title=url_payload.title,
+        )
+
+    if kind == "youtube":
+        if file is not None and file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Files are only supported for PDF sources",
+            )
+        try:
+            youtube_payload = SourceYoutubeCreate.model_validate(
+                {"kind": "youtube", "title": title, "url": url or ""}
+            )
+        except ValidationError as exc:
+            raise RequestValidationError(exc.errors()) from exc
+        try:
+            video_id = extract_video_id(str(youtube_payload.url))
+        except IngestionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=str(exc),
+            ) from exc
+        return await sources.create_youtube(
+            session,
+            notebook.id,
+            video_id=video_id,
+            url=f"https://www.youtube.com/watch?v={video_id}",
+            title=youtube_payload.title,
         )
 
     if file is None or not file.filename:

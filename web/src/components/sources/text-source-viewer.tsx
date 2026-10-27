@@ -1,42 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { ExternalLinkIcon } from "lucide-react";
 
-import {
-  getErrorMessage,
-  getSourceContent,
-  type Source,
-  type SourceContent,
-} from "@/lib/api";
-
-type State =
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "ready"; content: SourceContent };
+import { useSourceContent } from "@/hooks/use-source-content";
+import type { Source } from "@/lib/api";
 
 export function TextSourceViewer({ source }: { source: Source }) {
-  const [state, setState] = useState<State>({ status: "loading" });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    getSourceContent(source.id)
-      .then((content) => {
-        if (!cancelled) {
-          setState({ status: "ready", content });
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setState({ status: "error", message: getErrorMessage(error) });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [source.id]);
+  const state = useSourceContent(source.id);
 
   const originalUrl =
     typeof source.config.url === "string" ? source.config.url : null;

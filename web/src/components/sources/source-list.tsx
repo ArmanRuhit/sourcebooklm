@@ -6,6 +6,7 @@ import {
   Link2Icon,
   PlusIcon,
   RefreshCwIcon,
+  VideoIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -39,12 +40,15 @@ function sourceMeta(source: Source): string {
         // Keep the generic label for a malformed stored URL.
       }
     }
+  } else if (source.kind === "youtube") {
+    kindLabel = "YouTube";
   } else {
     kindLabel = "Text";
   }
 
   if (source.status === "ready") {
-    return `${source.chunk_count ?? 0} chunks · ${kindLabel}`;
+    const chunks = source.chunk_count ?? 0;
+    return `${chunks} ${chunks === 1 ? "chunk" : "chunks"} · ${kindLabel}`;
   }
 
   if (source.status === "failed") {
@@ -109,11 +113,11 @@ export function SourceList({
           </div>
           <p className="text-sm font-medium">No sources yet</p>
           <p className="max-w-56 text-xs text-muted-foreground">
-            Upload a PDF to turn it into citable, searchable context.
+            Upload a PDF or add an article or video link.
           </p>
           <Button size="sm" variant="outline" className="mt-2" onClick={onAdd}>
             <PlusIcon />
-            Add a PDF
+            Add a source
           </Button>
         </div>
       ) : (
@@ -139,6 +143,8 @@ export function SourceList({
                   <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border bg-background">
                     {source.kind === "url" ? (
                       <Link2Icon className="size-4 text-muted-foreground" />
+                    ) : source.kind === "youtube" ? (
+                      <VideoIcon className="size-4 text-muted-foreground" />
                     ) : (
                       <FileTextIcon className="size-4 text-muted-foreground" />
                     )}
