@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator
+from pydantic import BaseModel, ConfigDict, HttpUrl, StringConstraints, field_validator
 
 NotebookName = Annotated[
     str,
@@ -63,6 +63,28 @@ class SourceCreate(BaseModel):
     @classmethod
     def _blank_title_to_none(cls, value: str | None) -> str | None:
         return value or None
+
+
+class SourceUrlCreate(BaseModel):
+    """Multipart form fields for a website source."""
+
+    kind: Literal["url"]
+    title: SourceTitle | None = None
+    url: HttpUrl
+
+    @field_validator("title")
+    @classmethod
+    def _blank_title_to_none(cls, value: str | None) -> str | None:
+        return value or None
+
+
+class SourceContentRead(BaseModel):
+    """Stored text snapshot, used by the web viewer."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    text: str | None
+    pages: list[dict[str, Any]] | None
 
 
 class SourceRead(BaseModel):

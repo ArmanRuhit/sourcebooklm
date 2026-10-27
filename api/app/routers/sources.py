@@ -12,9 +12,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
 from app.config import settings
-from app.models import Source, SourceFile
+from app.models import Source, SourceContent, SourceFile
 from app.routers.deps import NotebookDep, SessionDep
-from app.schemas import SourceCreate, SourceRead
+from app.schemas import SourceContentRead, SourceCreate, SourceRead, SourceUrlCreate
 from app.services import sources
 
 notebook_sources_router = APIRouter(prefix="/notebooks", tags=["sources"])
@@ -65,12 +65,13 @@ async def list_sources(notebook: NotebookDep, session: SessionDep) -> list[Sourc
 async def create_source(
     notebook: NotebookDep,
     session: SessionDep,
-    kind: Annotated[Literal["text", "pdf"], Form()],
+    kind: Annotated[Literal["text", "pdf", "url"], Form()],
     title: Annotated[str | None, Form()] = None,
     text: Annotated[str | None, Form()] = None,
+    url: Annotated[str | None, Form()] = None,
     file: Annotated[UploadFile | None, File()] = None,
 ) -> Source:
-    """Add a text or PDF source; the worker picks it up from the queue."""
+    """Add a text, PDF, or website source; the worker picks it up from the queue."""
     if kind == "text":
         if file is not None and file.filename:
             raise HTTPException(
@@ -82,6 +83,25 @@ async def create_source(
         except ValidationError as exc:
             raise RequestValidationError(exc.errors()) from exc
         return await sources.create(session, notebook.id, payload)
+
+    if kind == "url":
+        if file is not None and file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Files are only supported for PDF sources",
+            )
+        try:
+            url_payload = SourceUrlCreate.model_validate(
+                {"kind": "url", "title": title, "url": url or ""}
+            )
+        except ValidationError as exc:
+            raise RequestValidationError(exc.errors()) from exc
+        return await sources.create_url(
+            session,
+            notebook.id,
+            url=str(url_payload.url),
+            title=url_payload.title,
+        )
 
     if file is None or not file.filename:
         raise HTTPException(
@@ -121,6 +141,19 @@ async def create_source(
 async def get_source(source_id: uuid.UUID, session: SessionDep) -> Source:
     """Get one source."""
     return await _get_source_or_404(session, source_id)
+
+
+@sources_router.get("/{source_id}/content", response_model=SourceContentRead)
+async def get_source_content(source_id: uuid.UUID, session: SessionDep) -> SourceContent:
+    """Return the stored text snapshot for the source viewer."""
+    await _get_source_or_404(session, source_id)
+    content = await session.get(SourceContent, source_id)
+    if content is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Source content not found",
+        )
+    return content
 
 
 @sources_router.get("/{source_id}/file")

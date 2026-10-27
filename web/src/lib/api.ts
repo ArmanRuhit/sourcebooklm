@@ -6,6 +6,7 @@ const API_URL = (
 
 export type Notebook = components["schemas"]["NotebookRead"];
 export type Source = components["schemas"]["SourceRead"];
+export type SourceContent = components["schemas"]["SourceContentRead"];
 
 export class ApiError extends Error {
   readonly status: number;
@@ -115,6 +116,23 @@ export function uploadPdf(notebookId: string, file: File): Promise<Source> {
   return request<Source>(`/api/v1/notebooks/${notebookId}/sources`, {
     method: "POST",
     body,
+  });
+}
+
+export function createUrlSource(notebookId: string, url: string): Promise<Source> {
+  const body = new FormData();
+  body.append("kind", "url");
+  body.append("url", url);
+
+  return request<Source>(`/api/v1/notebooks/${notebookId}/sources`, {
+    method: "POST",
+    body,
+  });
+}
+
+export function getSourceContent(sourceId: string): Promise<SourceContent> {
+  return request<SourceContent>(`/api/v1/sources/${sourceId}/content`, {
+    cache: "no-store",
   });
 }
 

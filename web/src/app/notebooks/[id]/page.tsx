@@ -16,10 +16,12 @@ import { AppHeader } from "@/components/app-header";
 import { AddSourceDialog } from "@/components/sources/add-source-dialog";
 import { PdfViewerPanel } from "@/components/sources/pdf-viewer-panel";
 import { SourceList } from "@/components/sources/source-list";
+import { TextSourceViewer } from "@/components/sources/text-source-viewer";
 import { Button } from "@/components/ui/button";
 import { useSources } from "@/hooks/use-sources";
 import {
   ApiError,
+  createUrlSource,
   getErrorMessage,
   getNotebook,
   getSourceFileUrl,
@@ -183,6 +185,11 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
     addSource(source);
   }
 
+  async function handleAddUrl(url: string) {
+    const source = await createUrlSource(notebook.id, url);
+    addSource(source);
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeader />
@@ -265,11 +272,18 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
                   <XIcon />
                 </Button>
               </div>
-              <PdfViewerPanel
-                key={viewer.source.id}
-                url={getSourceFileUrl(viewer.source.id)}
-                initialPage={viewer.page}
-              />
+              {viewer.source.kind === "pdf" ? (
+                <PdfViewerPanel
+                  key={viewer.source.id}
+                  url={getSourceFileUrl(viewer.source.id)}
+                  initialPage={viewer.page}
+                />
+              ) : (
+                <TextSourceViewer
+                  key={viewer.source.id}
+                  source={viewer.source}
+                />
+              )}
             </section>
           )}
         </div>
@@ -280,6 +294,7 @@ function NotebookWorkspace({ notebook }: { notebook: Notebook }) {
           open={addOpen}
           onOpenChange={setAddOpen}
           onUpload={handleUpload}
+          onAddUrl={handleAddUrl}
         />
       )}
     </div>

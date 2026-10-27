@@ -59,3 +59,9 @@
 1. **Fundamental** — `split_pages` chunks each page separately and keeps `char_start`/`char_end` relative to that page. Why is page-relative better than one global character offset for citations, and what breaks if chunk text is allowed to overlap across a page boundary?
 2. **Tradeoff** — PDF bytes live in Postgres (`source_files.bytea`) instead of S3 or the filesystem. What does that buy for a small single-service app (transactional delete, one backup, simple local dev) and what does it cost (database size, write amplification, memory pressure when streaming large files)?
 3. **Failure mode** — `useSources` polls only while the current list has an active source. After the initial list settles, a newly uploaded source is added locally as `queued` — why did polling never restart, and what is the minimal fix? (Here, `addSource` bumps the effect's `reloadKey`.)
+
+## P2.4 — website URL ingestion (banked 2026-10-28)
+
+1. **Fundamental** — Before fetching a user-supplied URL, `validate_public_url` resolves the hostname and rejects non-global IPs. What attack does that block, and why is checking the hostname string alone insufficient? What gap remains with HTTP redirects?
+2. **Tradeoff** — The worker stores the extracted article text in `source_contents` instead of re-fetching the page when the viewer opens. What does that buy (stable citations, no network at view time, works after the page changes) and what does it cost (storage, staleness, no live refresh)?
+3. **Failure mode** — Unit tests mocked `fetch_article`, so they passed while the production dependency `bs4` was missing. Why did only live smoke catch it, what kind of test covers the real loader, and when is mocking the whole extractor the wrong boundary?

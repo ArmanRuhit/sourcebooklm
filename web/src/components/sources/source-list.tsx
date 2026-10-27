@@ -3,6 +3,7 @@
 import {
   FileStackIcon,
   FileTextIcon,
+  Link2Icon,
   PlusIcon,
   RefreshCwIcon,
 } from "lucide-react";
@@ -22,24 +23,39 @@ type SourceListProps = {
 };
 
 function sourceMeta(source: Source): string {
-  const size =
-    typeof source.config.size_bytes === "number"
-      ? formatFileSize(source.config.size_bytes)
-      : "PDF";
+  let kindLabel: string;
+
+  if (source.kind === "pdf") {
+    kindLabel =
+      typeof source.config.size_bytes === "number"
+        ? formatFileSize(source.config.size_bytes)
+        : "PDF";
+  } else if (source.kind === "url") {
+    kindLabel = "Web";
+    if (typeof source.config.url === "string") {
+      try {
+        kindLabel = new URL(source.config.url).hostname.replace(/^www\./, "");
+      } catch {
+        // Keep the generic label for a malformed stored URL.
+      }
+    }
+  } else {
+    kindLabel = "Text";
+  }
 
   if (source.status === "ready") {
-    return `${source.chunk_count ?? 0} chunks · ${size}`;
+    return `${source.chunk_count ?? 0} chunks · ${kindLabel}`;
   }
 
   if (source.status === "failed") {
-    return `${size} · ingestion failed`;
+    return `${kindLabel} · ingestion failed`;
   }
 
   if (source.status === "processing") {
-    return size;
+    return kindLabel;
   }
 
-  return `${size} · waiting for worker`;
+  return `${kindLabel} · waiting for worker`;
 }
 
 export function SourceList({
@@ -103,7 +119,7 @@ export function SourceList({
       ) : (
         <ul className="flex flex-col gap-1 p-2">
           {sources.map((source) => {
-            const canOpen = source.kind === "pdf" && source.status === "ready";
+            const canOpen = source.status === "ready";
             const active = activeSourceId === source.id;
 
             return (
@@ -121,7 +137,11 @@ export function SourceList({
                   data-active={active}
                 >
                   <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border bg-background">
-                    <FileTextIcon className="size-4 text-muted-foreground" />
+                    {source.kind === "url" ? (
+                      <Link2Icon className="size-4 text-muted-foreground" />
+                    ) : (
+                      <FileTextIcon className="size-4 text-muted-foreground" />
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">

@@ -25,6 +25,8 @@ dependencies = [
     "langchain-postgres==0.0.19",
     "python-multipart>=0.0.32",
     "pypdf==6.4.0",
+    "requests==2.34.2",
+    "beautifulsoup4>=4.15.0",
 ]
 
 [dependency-groups]

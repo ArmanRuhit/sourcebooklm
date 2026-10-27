@@ -4,7 +4,7 @@
 
 Cohort rules live in [`../../CLAUDE.md`](../../CLAUDE.md) (Codecrafters format: brief → attempt → hints → verify). **Exception — owner directive (2026-10-08):** this project runs in **pair-typing mode** (§7 — the owner wants the full per-slice code in chat to type by hand). The Codecrafters default does not apply here. **Amendment (2026-10-10):** per-slice quizzes are deferred to post-project review — see §7.1 step 5 ([`docs/quiz-bank.md`](docs/quiz-bank.md)).
 
-Last updated: 2026-10-28 · Status: **P2.3 complete — PDFs upload, stream, extract page-by-page, and open in the workspace viewer; P2.4 (website URL ingestion) up next**
+Last updated: 2026-10-28 · Status: **P2.4 complete — website URLs fetch to readable text, index, and open in the workspace viewer; P2.5 (YouTube transcripts) up next**
 
 ## 1. Mission & success criteria
 
@@ -233,7 +233,7 @@ Pace context: assignment due **1 Jan 2027** (~12 weeks from 2026-10-08). Target:
 - [x] P2.1 Source API + worker skeleton (status machine, claim loop, crash recovery)
 - [x] P2.2 Text source end-to-end: chunk → embed → pgvector → `ready`
 - [x] P2.3 PDF: upload, bytea storage, file serving, viewer opens at page
-- [ ] P2.4 Website URL extraction
+- [x] P2.4 Website URL extraction
 - [ ] P2.5 YouTube transcript extraction (timestamped segments)
 - [ ] P2.6 VTT transcript parsing
 - [ ] P2.7 Remove / re-index / failure states + status polling UI
@@ -472,6 +472,17 @@ bunx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api-types.
 - **Tests** (14 new, 44 total): page extraction/encryption/corruption/scan-only; upload size/type/magic/title/404 cases; streamed bytes + headers; PDF pipeline page metadata; corrupt PDF failure. `ruff check`, `ruff format --check`, `mypy` (22 files), `pytest -q` all green.
 - **Manual evidence**: live 995 B PDF → `ready` in ~2 s with `chunk_count=2`, `char_count=161`; streamed file byte-identical with correct headers; browser viewer showed “Page 1 of 2” → “Page 2 of 2” and the extracted text; upload through the dialog rendered the new source and polling settled it without a refresh. Sources cleaned up; list back to `[]`.
 - **Next: P2.4 — website URL ingestion** (fetch with timeout/size guard, HTML → readable text, per-source metadata, same pipeline, UI tile live).
+
+### 2026-10-28 — P2.4 complete (website URL ingestion)
+
+- **URL API**: `POST /notebooks/{id}/sources` accepts `kind=url` + a form `url` validated by `SourceUrlCreate` (`HttpUrl`). `create_url` inserts a queued source titled from the hostname (or a custom title) and stores `{url, custom_title}`. `GET /sources/{id}/content` returns the stored text/pages snapshot for any source, which the viewer reuses.
+- **SSRF guard**: before fetching, `validate_public_url` requires http(s), no credentials, no localhost/`.local`, and resolves every address via `getaddrinfo`, rejecting non-global IPs. This blocks obvious private-network targets; redirects are not re-validated hop-by-hop, which is documented as the remaining gap.
+- **Extraction**: `fetch_article` uses LangChain `WebBaseLoader` with a 15 s timeout, a project User-Agent, and `bs_get_text_kwargs={"separator": "\n"}` so headings/paragraphs don't concatenate. It captures the `<title>`, meta description, and final URL, and maps timeouts/HTTP errors/empty pages to explicit `IngestionError`s. `bs4` was missing from the initial dependency set — live smoke caught it, and it plus a local-HTTP test now guard the real loader path.
+- **Pipeline**: the URL branch of `_extract` fetches off the event loop, writes a `source_contents` text snapshot, updates `char_count`, replaces a hostname title with the page title unless the user supplied one, stores `final_url`/`description` in `config`, and then uses the same chunk → embed → index path.
+- **Web**: the Web link tile is live in the Add dialog; the URL form normalizes and validates in the browser; URL rows show the hostname and open a read-only text viewer with the original link. The sources list now opens any ready source (PDF or text).
+- **Tests** (16 new, 60 total): public/private URL validation, URL creation and config, invalid URL cases, content endpoint + 404, a real local-HTML `WebBaseLoader` round trip, and mocked URL pipeline success/failure with vector metadata. `ruff check`, `ruff format --check`, `mypy` (23 files), and `pytest -q` are green.
+- **Manual evidence**: live ingest of `https://example.com` reached `ready` in ~1 s with `chunk_count=1`, `char_count=170`, title “Example Domain”, and a newline-separated text snapshot; the viewer rendered the text and an `Open original` link to `https://example.com/`. Adding a second link through the dialog reached Ready without a refresh; both smoke sources were deleted (list `[]`).
+- **Next: P2.5 — YouTube** (`youtube-transcript-api` segments with start/duration, oEmbed title, timestamped chunk metadata, watch/youtu.be/shorts URL forms).
 
 ## 12. Docs map
 

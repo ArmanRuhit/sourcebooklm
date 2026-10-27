@@ -19,6 +19,7 @@ from app.services import vector_store
 from app.services.ingestion.chunker import Chunk, split_pages, split_text
 from app.services.ingestion.errors import IngestionError
 from app.services.ingestion.pdf import extract_pages
+from app.services.ingestion.web import fetch_article
 
 
 class IngestState(TypedDict, total=False):
@@ -50,6 +51,35 @@ async def _extract(state: IngestState) -> dict[str, Any]:
         source = await session.get(Source, source_id)
         if source is None:
             raise IngestionError("Source disappeared before extraction")
+
+        if source.kind == "url":
+            config = dict(source.config or {})
+            article = await run_in_threadpool(fetch_article, str(config.get("url") or ""))
+
+            content = await session.get(SourceContent, source_id)
+            if content is None:
+                content = SourceContent(source_id=source_id)
+                session.add(content)
+            content.text = article.text
+            content.pages = None
+
+            source.char_count = len(article.text)
+            source.stage = "chunking"
+            if not config.get("custom_title") and article.title:
+                source.title = article.title
+            source.config = {
+                **config,
+                "final_url": article.url,
+                **({"description": article.description} if article.description else {}),
+            }
+            await session.commit()
+
+            return {
+                "text": article.text,
+                "notebook_id": str(source.notebook_id),
+                "kind": source.kind,
+                "title": source.title,
+            }
 
         if source.kind == "pdf":
             uploaded = await session.get(SourceFile, source_id)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   CaptionsIcon,
   FileTextIcon,
@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { getErrorMessage } from "@/lib/api";
 import { formatFileSize } from "@/lib/format";
 
@@ -51,7 +52,7 @@ const SOURCE_TILES: {
     label: "Web link",
     description: "Articles and docs",
     icon: Link2Icon,
-    available: false,
+    available: true,
   },
   {
     key: "text",
@@ -73,17 +74,22 @@ type AddSourceDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpload: (file: File) => Promise<void>;
+  onAddUrl: (url: string) => Promise<void>;
 };
 
 export function AddSourceDialog({
   open,
   onOpenChange,
   onUpload,
+  onAddUrl,
 }: AddSourceDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [mode, setMode] = useState<"tiles" | "url">("tiles");
+  const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [addingUrl, setAddingUrl] = useState(false);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0] ?? null;
@@ -124,13 +130,43 @@ export function AddSourceDialog({
     }
   }
 
+  async function handleUrlSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = url.trim();
+
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      setError("Enter a valid URL.");
+      return;
+    }
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      setError("Use an http:// or https:// URL.");
+      return;
+    }
+
+    setAddingUrl(true);
+    setError(null);
+
+    try {
+      await onAddUrl(parsed.toString());
+      onOpenChange(false);
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+      setAddingUrl(false);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Add a source</DialogTitle>
           <DialogDescription>
-            Upload a PDF now. Other source types arrive in the next slices.
+            Upload a PDF or add an article link. Other source types arrive in
+            the next slices.
           </DialogDescription>
         </DialogHeader>
 
@@ -143,7 +179,55 @@ export function AddSourceDialog({
           tabIndex={-1}
         />
 
-        {file ? (
+        {mode === "url" ? (
+          <form onSubmit={handleUrlSubmit} className="grid gap-3" noValidate>
+            <div className="grid gap-1.5">
+              <label htmlFor="source-url" className="text-xs font-medium">
+                Article URL
+              </label>
+              <Input
+                id="source-url"
+                type="url"
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+                placeholder="https://example.com/article"
+                autoFocus
+                disabled={addingUrl}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              We&apos;ll fetch the page, keep a text snapshot, and index it.
+            </p>
+
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setMode("tiles");
+                  setError(null);
+                }}
+                disabled={addingUrl}
+              >
+                Back
+              </Button>
+              <Button type="submit" disabled={addingUrl || !url.trim()}>
+                {addingUrl ? (
+                  <Loader2Icon className="animate-spin" />
+                ) : (
+                  <Link2Icon />
+                )}
+                {addingUrl ? "Adding..." : "Add link"}
+              </Button>
+            </div>
+          </form>
+        ) : file ? (
           <div className="grid gap-3">
             <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-background">
@@ -196,7 +280,14 @@ export function AddSourceDialog({
                     key={tile.key}
                     type="button"
                     disabled={!tile.available}
-                    onClick={() => inputRef.current?.click()}
+                    onClick={() => {
+                      if (tile.key === "pdf") {
+                        inputRef.current?.click();
+                      } else if (tile.key === "url") {
+                        setMode("url");
+                        setError(null);
+                      }
+                    }}
                     className="relative flex flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-transparent"
                   >
                     <Icon className="size-5 text-muted-foreground" />
